@@ -284,7 +284,7 @@ picture *picture_read(const char *name)
 		goto picture_read_malloc;
 	}
 
-	err = TIFFReadRGBAImageOriented(tiffp, width, height, buffer, ORIENTATION_BOTLEFT, 0);
+	err = TIFFReadRGBAImageOriented(tiffp, width, height, buffer, ORIENTATION_TOPLEFT, 0);
 	if (err == 0) {
 		fprintf(stderr, "Unable to read picture %s\n", name);
 		goto picture_read_read;
