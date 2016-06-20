@@ -14,7 +14,7 @@
  * details.
  *
  * You should have received a copy of the GNU General Public License along with
- * any2colçoring. If not, see <http://www.gnu.org/licenses/>.
+ * any2coloring. If not, see <http://www.gnu.org/licenses/>.
  */
 
 // strdup(), getopt()
