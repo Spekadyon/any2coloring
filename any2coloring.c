@@ -21,6 +21,7 @@
 #define _POSIX_C_SOURCE 200809L
 
 #include <errno.h>
+#include <libgen.h>
 #include <search.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -72,7 +73,7 @@ typedef struct pattern_s pattern;
  * Prototypes
  */
 
-void help_die(const char *str);
+void help_die(char *str);
 bool pixel_compare(pixel A, pixel B);
 bool pixel_isblack(pixel A);
 bool pixel_onedge(const picture *pic, point position);
@@ -114,10 +115,15 @@ void hash_add_entry(const char *key, intptr_t number)
  * Help
  */
 
-void help_die(const char *str)
+void help_die(char *str)
 {
 	fprintf(stderr, "Usage\n");
-	fprintf(stderr, "\t%s image.png [output.svg]\n", str);
+	fprintf(stderr, "\t%s [options] -i image.png [-o output.svg]\n", basename(str));
+	fprintf(stderr, "\n");
+	fprintf(stderr, "Options:\n");
+	fprintf(stderr, "\t-i\tinput image file (mandatory)\n");
+	fprintf(stderr, "\t-o\toutput file\n");
+	fprintf(stderr, "\t-f\toverwrite output file\n");
 	exit(EXIT_FAILURE);
 }
 
@@ -278,7 +284,7 @@ picture *picture_read(const char *name)
 		goto picture_read_malloc;
 	}
 
-	err = TIFFReadRGBAImage(tiffp, width, height, buffer, 0);
+	err = TIFFReadRGBAImageOriented(tiffp, width, height, buffer, ORIENTATION_BOTLEFT, 0);
 	if (err == 0) {
 		fprintf(stderr, "Unable to read picture %s\n", name);
 		goto picture_read_read;
@@ -332,12 +338,45 @@ const char *color2str(color col)
 
 int main(int argc, char *argv[])
 {
-	if (argc < 2)
-		help_die(argv[0]);
+	/*
+	 * Opts
+	 */
 
-	if (access(argv[1], R_OK) == -1) {
-		fprintf(stderr, "Unable to access file %s: %s\n", argv[1],
-			strerror(errno));
+	char *opt_input = NULL;
+	char *opt_output = NULL;
+	char *opt_soluce = NULL;
+	bool opt_force = false;
+	int opt;
+
+	while ( (opt = getopt(argc, argv, "i:o:s:f")) != -1 ) {
+		switch (opt) {
+		case 'i':
+			opt_input = optarg;
+			break;
+		case 'o':
+			opt_output = optarg;
+			break;
+		case 's':
+			opt_soluce = optarg;
+			break;
+		case 'f':
+			opt_force = true;
+			break;
+		default:
+			fprintf(stderr, "Unknown option: %c\n", opt);
+		}
+	}
+
+	if (opt_input == NULL)
+		help_die(argv[0]);
+	// Testing the existence of the file with access() is not reliable
+	if ( (opt_output != NULL) && (access(opt_output, F_OK) == 0) && !opt_force) {
+		fprintf(stderr, "%s already exists, use option -f to overwrite\n", opt_output);
+		exit(EXIT_FAILURE);
+	}
+
+	if (access(opt_input, R_OK) == -1) {
+		fprintf(stderr, "Unable to access file %s: %s\n", opt_input, strerror(errno));
 		exit(EXIT_FAILURE);
 	}
 
@@ -346,16 +385,11 @@ int main(int argc, char *argv[])
 	 */
 	FILE *fp;
 
-	if (argc == 3) {
-		if (access(argv[2], F_OK) == 0) {
-			fprintf(stderr, "File %s already exists, aborting\n",
-				argv[2]);
-			exit(EXIT_FAILURE);
-		}
-		fp = fopen(argv[2], "w");
+	if (opt_output) {
+		fp = fopen(opt_output, "w");
 		if (fp == NULL) {
-			fprintf(stderr, "Unable to write to file %s: %s\n",
-				argv[2], strerror(errno));
+			fprintf(stderr, "Unabel to write to file %s: %s\n", opt_output,
+				strerror(errno));
 			exit(EXIT_FAILURE);
 		}
 	} else {
@@ -368,7 +402,7 @@ int main(int argc, char *argv[])
 
 	picture *pic;
 
-	pic = picture_read(argv[1]);
+	pic = picture_read(opt_input);
 	if (pic == NULL)
 		exit(EXIT_FAILURE);
 
