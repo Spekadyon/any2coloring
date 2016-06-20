@@ -17,6 +17,7 @@
  * any2colçoring. If not, see <http://www.gnu.org/licenses/>.
  */
 
+// strdup(), getopt()
 #define _POSIX_C_SOURCE 200809L
 
 #include <errno.h>
@@ -248,6 +249,69 @@ void picture_free(picture *pic)
 	free(pic);
 }
 
+picture *picture_read(const char *name)
+{
+	picture *pic = NULL;
+	uint32_t width, height;
+	uint32_t *buffer;
+	int err;
+
+	TIFF *tiffp;
+	tiffp = TIFFOpen(name, "r");
+	if (tiffp == NULL) {
+		fprintf(stderr, "Unable to open %s\n", name);
+		goto picture_read_tiff;
+	}
+
+	if (!TIFFGetField(tiffp, TIFFTAG_IMAGEWIDTH, &width)) {
+		fprintf(stderr, "Unable to retrieve picture width\n");
+		goto picture_read_getfield;
+	}
+	if (!TIFFGetField(tiffp, TIFFTAG_IMAGELENGTH, &height)) {
+		fprintf(stderr, "Unable to retrieve picture height\n");
+		goto picture_read_getfield;
+	}
+
+	if ( (buffer = malloc(width * height * sizeof(uint32_t))) == NULL ) {
+		fprintf(stderr, "Unable to allocate temporary memory for "
+			"picture buffer: %s\n", strerror(errno));
+		goto picture_read_malloc;
+	}
+
+	err = TIFFReadRGBAImage(tiffp, width, height, buffer, 0);
+	if (err == 0) {
+		fprintf(stderr, "Unable to read picture %s\n", name);
+		goto picture_read_read;
+	}
+
+	TIFFClose(tiffp);
+	tiffp = NULL;
+
+	pic = picture_allocate(width, height);
+
+	pic->width = width;
+	pic->height = height;
+
+	for (size_t y = 0; y < height; y += 1) {
+		for (size_t x = 0; x < width; x += 1) {
+			size_t idx = x + y*width;
+			pic->pixels[idx].color.R = TIFFGetR(buffer[idx]);
+			pic->pixels[idx].color.G = TIFFGetG(buffer[idx]);
+			pic->pixels[idx].color.B = TIFFGetB(buffer[idx]);
+		}
+	}
+
+picture_read_read:
+	free(buffer);
+picture_read_malloc:
+picture_read_getfield:
+	if (tiffp)
+		TIFFClose(tiffp);
+picture_read_tiff:
+	return pic;
+
+}
+
 
 /*
  * Other functions
@@ -303,57 +367,12 @@ int main(int argc, char *argv[])
 	 */
 
 	picture *pic;
-	uint32_t width, height;
-	uint32_t *buffer;
-	int err;
 
-	TIFF *tiffp;
-	tiffp = TIFFOpen(argv[1], "r");
-	if (tiffp == NULL) {
-		fprintf(stderr, "Unable to open %s\n", argv[1]);
+	pic = picture_read(argv[1]);
+	if (pic == NULL)
 		exit(EXIT_FAILURE);
-	}
 
-	if (!TIFFGetField(tiffp, TIFFTAG_IMAGEWIDTH, &width)) {
-		fprintf(stderr, "Unable to retrieve picture width\n");
-		exit(EXIT_FAILURE);
-	}
-	if (!TIFFGetField(tiffp, TIFFTAG_IMAGELENGTH, &height)) {
-		fprintf(stderr, "Unable to retrieve picture height\n");
-		exit(EXIT_FAILURE);
-	}
-
-	if ( (buffer = malloc(width * height * sizeof(uint32_t))) == NULL ) {
-		fprintf(stderr, "Unable to allocate temporary memory for "
-			"picture buffer: %s\n", strerror(errno));
-		exit(EXIT_FAILURE);
-	}
-
-	err = TIFFReadRGBAImage(tiffp, width, height, buffer, 0);
-	if (err == 0) {
-		fprintf(stderr, "Unable to read picture %s\n", argv[1]);
-		exit(EXIT_FAILURE);
-	}
-
-	TIFFClose(tiffp);
-
-	pic = picture_allocate(width, height);
-
-	pic->width = width;
-	pic->height = height;
-
-	for (size_t y = 0; y < height; y += 1) {
-		for (size_t x = 0; x < width; x += 1) {
-			size_t idx = x + y*width;
-			pic->pixels[idx].color.R = TIFFGetR(buffer[idx]);
-			pic->pixels[idx].color.G = TIFFGetG(buffer[idx]);
-			pic->pixels[idx].color.B = TIFFGetB(buffer[idx]);
-		}
-	}
-
-	free(buffer);
-
-	/* Color hash management */
+	/* Color hash management, to be removed™ */
 	// 128 >> 36 crayons de couleur
 	if (hcreate(128) == 0) {
 		fprintf(stderr, "Unable to create hash map: %s\n",
@@ -405,20 +424,26 @@ int main(int argc, char *argv[])
 	GArray *pattern_list;
 	pattern_list = g_array_new(FALSE, FALSE, sizeof(pattern));
 
-	for (size_t y = 0; y < height; y += 1) {
-		for (size_t x = 0; x < width; x += 1) {
-			// Direction initiale == horizontale vers la droite
+	// gmic output: colored zoned oulined with black lines. The width of the
+	// colored zones is at least 2 pixel large. The outline of each zone is
+	// detected and recorded in "pattern_list".
+	// pattern_list is an array of patterns: list of zone edges and color of
+	// the zone
+	//
+	// Picture coordinates: origin == south west, horizintal axis == x
+	// (row-major order)
+	for (size_t y = 0; y < pic->height; y += 1) {
+		for (size_t x = 0; x < pic->width; x += 1) {
+			// Initial direction: x-axis (1, 0), position (x, y)
 			point direction = {1, 0};
 			point position = {x, y};
 
-			// Si le pixel est noir, on passe
+			// If the pixel is black, we are not in a colored zone:
+			// next
 			if (pixel_isblack(picture_get_pixel(pic, position)))
 				continue;
 
-			// Correction : absolument pas inutile, permet de
-			// traiter le cas de structures imbriquées !
-			// Recherche le pixel inférieur gauche (SO) de la
-			// structure == origine
+			// Next, go to the origin of the zone
 			while ( (! pixel_isblack(picture_get_pixel(pic, (point){position.x-1, position.y}))) ||
 				(! pixel_isblack(picture_get_pixel(pic, (point){position.x, position.y - 1}))) ) {
 				if (! pixel_isblack(picture_get_pixel(pic, (point){position.x-1, position.y})) )
@@ -427,21 +452,33 @@ int main(int argc, char *argv[])
 					position.y -= 1;
 			}
 
-			// Si le pixel a déjà été marqué, on passe
+			// If the pixel at the zone origin is already marked as
+			// checked, next one
 			if (picture_get_pixel(pic, position).checked)
 				continue;
 
+			// We store the list of points (edges) in
+			// pattern_current
 			pattern pattern_current;
 			pattern_current.points = g_array_new(FALSE, FALSE, sizeof(point));
 
 
+			// Store the position of the first edge: S/W of the
+			// origin
 			point edge_dir;
 			point edge_pos;
+			// Direction == (-1, -1), or ( [1, -1], [-1, 1] ) . (1,
+			// 0)
 			edge_dir.x = -direction.x + direction.y;
 			edge_dir.y = -direction.x - direction.y;
 			edge_pos = point_next(position, edge_dir);
 			g_array_append_val(pattern_current.points, edge_pos);
+			// Store the color of the current zone
 			pattern_current.color = picture_get_pixel(pic, position).color;
+
+			// The vertices are followed along "direction", the
+			// black line remaining on the righ (relative to pixel,
+			// direction).
 
 			for(;;) {
 				pixel pixel_current = picture_get_pixel(pic, position);
@@ -454,6 +491,8 @@ int main(int argc, char *argv[])
 
 				// Si voisin à droite == pas noir, on tourne à
 				// droite
+				// If the next (neighbour) pixel on the right is
+				// not black, we turn on the right
 				dir_neighbour = point_rotate_right(direction);
 				pt_neighbour = point_next(position, dir_neighbour);
 				px_neighbour = picture_get_pixel(pic, pt_neighbour);
