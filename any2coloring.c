@@ -374,27 +374,16 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "%s already exists, use option -f to overwrite\n", opt_output);
 		exit(EXIT_FAILURE);
 	}
+	if ( (opt_soluce != NULL) && (access(opt_soluce, F_OK) == 0) && !opt_force) {
+		fprintf(stderr, "%s already exists, use option -f to overwrite\n", opt_soluce);
+		exit(EXIT_FAILURE);
+	}
 
 	if (access(opt_input, R_OK) == -1) {
 		fprintf(stderr, "Unable to access file %s: %s\n", opt_input, strerror(errno));
 		exit(EXIT_FAILURE);
 	}
 
-	/*
-	 * Output file
-	 */
-	FILE *fp;
-
-	if (opt_output) {
-		fp = fopen(opt_output, "w");
-		if (fp == NULL) {
-			fprintf(stderr, "Unabel to write to file %s: %s\n", opt_output,
-				strerror(errno));
-			exit(EXIT_FAILURE);
-		}
-	} else {
-		fp = stdout;
-	}
 
 	/*
 	 * TIFF/Open/Read/etc.
@@ -577,6 +566,23 @@ int main(int argc, char *argv[])
 	 * SVG output
 	 */
 
+	// Output files
+
+	FILE *fp;
+
+	if (opt_output) {
+		fp = fopen(opt_output, "w");
+		if (fp == NULL) {
+			fprintf(stderr, "Unabel to write to file %s: %s\n", opt_output,
+				strerror(errno));
+			exit(EXIT_FAILURE);
+		}
+	} else {
+		fp = stdout;
+	}
+
+	// SVG !
+
 	fprintf(fp, "<svg version=\"1.1\"\nbaseProfile=\"full\"\nwidth=\"300\" height=\"200\"\nxmlns=\"http://www.w3.org/2000/svg\">\n");
 
 	for (size_t idx = 0; idx < pattern_list->len; idx += 1) {
@@ -611,6 +617,52 @@ int main(int argc, char *argv[])
 
 	if (fp != stdout)
 		fclose(fp);
+
+	// Soluce
+
+	if (opt_soluce) {
+		fp = fopen(opt_soluce, "w");
+		if (fp == NULL) {
+			fprintf(stderr, "Unabel to write to file %s: %s\n", opt_soluce, strerror(errno));
+			exit(EXIT_FAILURE);
+		}
+
+		// SVG !
+
+		fprintf(fp, "<svg version=\"1.1\"\nbaseProfile=\"full\"\nwidth=\"300\" height=\"200\"\nxmlns=\"http://www.w3.org/2000/svg\">\n");
+
+		for (size_t idx = 0; idx < pattern_list->len; idx += 1) {
+			pattern *pattern_current;
+			pattern_current = &g_array_index(pattern_list, pattern, idx);
+			fprintf(fp, "\t<polygon style=\"fill: %s; stroke: lightgrey; stroke-width: .5px\" points=\"", color2str(pattern_current->color));
+			for (size_t edge = 0; edge < pattern_current->points->len; edge += 1) {
+				point *pt = &g_array_index(pattern_current->points, point, edge);
+				fprintf(fp, "%d %d, ", pt->x, pt->y);
+			}
+			point *pt = &g_array_index(pattern_current->points, point, 0);
+			fprintf(fp, "%d %d", pt->x, pt->y);
+			fprintf(fp, "\"/>\n");
+			fprintf(fp, "\t<text x=\"%g\" y=\"%g\" font-size=\"4.75\" font-family=\"Nimbus Sans L\" style=\"fill: dimgray\">", pt->x-0.1, (double)(pt->y+7));
+
+			ENTRY enter_in, *enter_out;
+			enter_in.key = color2str(pattern_current->color);
+			enter_out = hsearch(enter_in, FIND);
+			if (enter_out == NULL) {
+				fprintf(stderr, "Unable to find matching color, default to ???\n");
+				fprintf(fp, "???");
+			} else {
+				fprintf(fp, "%ld", (intptr_t)enter_out->data);
+			}
+
+			fprintf(fp, "</text>\n");
+		}
+
+		fprintf(fp, "</svg>\n");
+
+		// output file close
+
+		fclose(fp);
+	}
 
 	// free() !
 
