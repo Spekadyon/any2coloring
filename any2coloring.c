@@ -40,6 +40,12 @@ struct color_s {
 	uint8_t A;
 };
 
+struct palette_s {
+	struct color_s color;
+	uint32_t hex;
+	int num;
+};
+
 struct pixel_s {
 	struct color_s color;
 	bool checked;
@@ -67,6 +73,7 @@ typedef struct pixel_s pixel;
 typedef struct picture_s picture;
 typedef struct point_s point;
 typedef struct pattern_s pattern;
+typedef struct palette_s palette;
 
 
 /*
@@ -89,44 +96,53 @@ const char *color2str(color col);
 
 
 /*
- * (really) dirty, depends on Faber's palette, to be improved
- */
-
-void hash_add_entry(const char *key, intptr_t number)
-{
-	ENTRY entry;
-
-	entry.key = strdup(key);
-	if (entry.key == NULL) {
-		fprintf(stderr, "Unable to duplicate string: %s\n",
-			strerror(errno));
-		exit(EXIT_FAILURE);
-	}
-	entry.data = (void *)number;
-	if (hsearch(entry, ENTER) == NULL) {
-		fprintf(stderr, "Unable to insert %s => %d in the hash map: "
-			"%s\n", key, (int)number, strerror(errno));
-		exit(EXIT_FAILURE);
-	}
-}
-
-
-/*
  * Help
  */
 
 void help_die(char *str)
 {
 	fprintf(stderr, "Usage\n");
-	fprintf(stderr, "\t%s [options] -i image.png [-o output.svg]\n", basename(str));
+	fprintf(stderr, "\t%s [options] -i image.png -p palette.csv [-o output.svg]\n", basename(str));
 	fprintf(stderr, "\n");
 	fprintf(stderr, "Options:\n");
-	fprintf(stderr, "\t-i\tinput image file (mandatory)\n");
-	fprintf(stderr, "\t-o\toutput file\n");
-	fprintf(stderr, "\t-f\toverwrite output file\n");
+	fprintf(stderr, "\t-i <arg>\tinput image file (mandatory)\n");
+	fprintf(stderr, "\t-p <arg>\tpalette (colors)\n");
+	fprintf(stderr, "\t-o <arg>\toutput file\n");
+	fprintf(stderr, "\t-f\t\toverwrite output file\n");
 	exit(EXIT_FAILURE);
 }
 
+/*
+ * Palette-related functions
+ */
+
+bool color_compare(color A, color B)
+{
+	if (
+	    A.R == B.R &&
+	    A.G == B.G &&
+	    A.B == B.B
+	   ) {
+		return true;
+	} else {
+		return false;
+	}
+}
+
+
+int palette_color2num(const GArray *pal, color clr)
+{
+	for (size_t i = 0; i < pal->len; i += 1) {
+		palette *elt;
+
+		elt = &g_array_index(pal, struct palette_s, i);
+
+		if (color_compare(elt->color, clr)) {
+			return elt->num;
+		}
+	}
+	return -1;
+}
 
 /*
  * Pixel-related functions
@@ -338,6 +354,8 @@ const char *color2str(color col)
 
 int main(int argc, char *argv[])
 {
+	FILE *fp;
+
 	/*
 	 * Opts
 	 */
@@ -345,10 +363,11 @@ int main(int argc, char *argv[])
 	char *opt_input = NULL;
 	char *opt_output = NULL;
 	char *opt_soluce = NULL;
+	char *opt_palette = NULL;
 	bool opt_force = false;
 	int opt;
 
-	while ( (opt = getopt(argc, argv, "i:o:s:f")) != -1 ) {
+	while ( (opt = getopt(argc, argv, "i:o:s:fp:")) != -1 ) {
 		switch (opt) {
 		case 'i':
 			opt_input = optarg;
@@ -362,12 +381,18 @@ int main(int argc, char *argv[])
 		case 'f':
 			opt_force = true;
 			break;
+		case 'p':
+			opt_palette = optarg;
+			break;
 		default:
 			fprintf(stderr, "Unknown option: %c\n", opt);
 		}
 	}
 
+	// mandatory options
 	if (opt_input == NULL)
+		help_die(argv[0]);
+	if (opt_palette == NULL)
 		help_die(argv[0]);
 	// Testing the existence of the file with access() is not reliable
 	if ( (opt_output != NULL) && (access(opt_output, F_OK) == 0) && !opt_force) {
@@ -379,10 +404,41 @@ int main(int argc, char *argv[])
 		exit(EXIT_FAILURE);
 	}
 
-	if (access(opt_input, R_OK) == -1) {
-		fprintf(stderr, "Unable to access file %s: %s\n", opt_input, strerror(errno));
+	/*
+	 * Reading palette
+	 * Must be a tab separated-value files, with hex color in the first
+	 * color and unique numbers in the second one
+	 */
+
+	fp = fopen(opt_palette, "r");
+	if (fp == NULL) {
+		fprintf(stderr, "Unable to open palette file %s: %s\n", opt_palette, strerror(errno));
 		exit(EXIT_FAILURE);
 	}
+
+	GArray *color_palette;
+	color_palette = g_array_new(FALSE, FALSE, sizeof(palette));
+
+	char *line = NULL;
+	size_t len = 0;
+	ssize_t read;
+	while ( (read = getline(&line, &len, fp)) != -1 ) {
+		unsigned int color;
+		int number;
+
+		if (sscanf(line, "%x\t%d", &color, &number) == 2) {
+			struct color_s col;
+			col = (struct color_s) {
+				.R = (color >> 16) & 0xFF,
+				.G = (color >> 8 ) & 0xFF,
+				.B = (color)       & 0xFF
+			};
+			palette tmp = {.color = col, .hex = color, .num = number};
+			g_array_append_val(color_palette, tmp);
+		}
+	}
+
+	fclose(fp);
 
 
 	/*
@@ -394,50 +450,6 @@ int main(int argc, char *argv[])
 	pic = picture_read(opt_input);
 	if (pic == NULL)
 		exit(EXIT_FAILURE);
-
-	/* Color hash management, to be removed™ */
-	// 128 >> 36 crayons de couleur
-	if (hcreate(128) == 0) {
-		fprintf(stderr, "Unable to create hash map: %s\n",
-			strerror(errno));
-		exit(EXIT_FAILURE);
-	}
-	hash_add_entry("#ffffff", 101);
-	hash_add_entry("#f0f150", 104);
-	hash_add_entry("#fcd31d", 107);
-	hash_add_entry("#f89c20", 109);
-	hash_add_entry("#f36627", 115);
-	hash_add_entry("#e8373f", 118);
-	hash_add_entry("#ef2e49", 121);
-	hash_add_entry("#da1e45", 126);
-	hash_add_entry("#8f3b60", 133);
-	hash_add_entry("#c4248b", 125);
-	hash_add_entry("#da6dbd", 119);
-	hash_add_entry("#9f36a0", 134);
-	hash_add_entry("#5447a0", 137);
-	hash_add_entry("#4546a2", 141);
-	hash_add_entry("#b3a6da", 139);
-	hash_add_entry("#386cbd", 151);
-	hash_add_entry("#2865b9", 143);
-	hash_add_entry("#80d6f7", 147);
-	hash_add_entry("#519cdb", 152);
-	hash_add_entry("#3467ba", 144);
-	hash_add_entry("#75d1da", 154);
-	hash_add_entry("#4dc085", 162);
-	hash_add_entry("#29b46f", 163);
-	hash_add_entry("#6ec84e", 166);
-	hash_add_entry("#25685f", 158);
-	hash_add_entry("#467745", 167);
-	hash_add_entry("#6c8b65", 172);
-	hash_add_entry("#654f4c", 176);
-	hash_add_entry("#8e3742", 192);
-	hash_add_entry("#d58c51", 187);
-	hash_add_entry("#fab792", 132);
-	hash_add_entry("#cbd2d9", 230);
-	hash_add_entry("#757779", 273);
-	hash_add_entry("#13100f", 199);
-	hash_add_entry("#a5b1bc", 251);
-	hash_add_entry("#cabf7b", 250);
 
 
 	/*
@@ -568,7 +580,6 @@ int main(int argc, char *argv[])
 
 	// Output files
 
-	FILE *fp;
 
 	if (opt_output) {
 		fp = fopen(opt_output, "w");
@@ -597,16 +608,7 @@ int main(int argc, char *argv[])
 		fprintf(fp, "%d %d", pt->x, pt->y);
 		fprintf(fp, "\"/>\n");
 		fprintf(fp, "\t<text x=\"%g\" y=\"%g\" font-size=\"4.75\" font-family=\"Nimbus Sans L\" style=\"fill: dimgray\">", pt->x-0.1, (double)(pt->y+7));
-
-		ENTRY enter_in, *enter_out;
-		enter_in.key = color2str(pattern_current->color);
-		enter_out = hsearch(enter_in, FIND);
-		if (enter_out == NULL) {
-			fprintf(stderr, "Unable to find matching color, default to ???\n");
-			fprintf(fp, "???");
-		} else {
-			fprintf(fp, "%ld", (intptr_t)enter_out->data);
-		}
+		fprintf(fp, "%d", palette_color2num(color_palette, pattern_current->color));
 
 		fprintf(fp, "</text>\n");
 	}
@@ -644,16 +646,7 @@ int main(int argc, char *argv[])
 			fprintf(fp, "\"/>\n");
 			fprintf(fp, "\t<text x=\"%g\" y=\"%g\" font-size=\"4.75\" font-family=\"Nimbus Sans L\" style=\"fill: dimgray\">", pt->x-0.1, (double)(pt->y+7));
 
-			ENTRY enter_in, *enter_out;
-			enter_in.key = color2str(pattern_current->color);
-			enter_out = hsearch(enter_in, FIND);
-			if (enter_out == NULL) {
-				fprintf(stderr, "Unable to find matching color, default to ???\n");
-				fprintf(fp, "???");
-			} else {
-				fprintf(fp, "%ld", (intptr_t)enter_out->data);
-			}
-
+			fprintf(fp, "%d", palette_color2num(color_palette, pattern_current->color));
 			fprintf(fp, "</text>\n");
 		}
 
@@ -672,6 +665,7 @@ int main(int argc, char *argv[])
 		g_array_free(pat->points, TRUE);
 	}
 	g_array_free(pattern_list, TRUE);
+	g_array_free(color_palette, TRUE);
 
 	return EXIT_SUCCESS;
 }
