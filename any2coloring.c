@@ -44,7 +44,6 @@ struct color_s {
 	uint8_t R;
 	uint8_t G;
 	uint8_t B;
-	uint8_t A;
 };
 
 struct palette_s {
@@ -165,8 +164,7 @@ bool pixel_compare(pixel A, pixel B)
 {
 	if ( (A.color.R == B.color.R) &&
 	     (A.color.G == B.color.G) &&
-	     (A.color.B == B.color.B) &&
-	     (A.color.A == B.color.A) ) {
+	     (A.color.B == B.color.B) ) {
 		return true;
 	} else {
 		return false;
@@ -241,8 +239,7 @@ bool point_compare(point A, point B)
 
 pixel picture_get_pixel(const picture *pic, point pt)
 {
-	pixel black = { .color.R = 0, .color.G = 0, .color.B = 0,
-		.color.A = 0xFF, .checked = true };
+	pixel black = { .color.R = 0, .color.G = 0, .color.B = 0, .checked = true };
 
 	if ( (pt.x < 0) || (pt.x >= (ssize_t)pic->width) ||
 	     (pt.y < 0) || (pt.y >= (ssize_t)pic->height) ) {
