@@ -403,11 +403,10 @@ int main(int argc, char *argv[])
 		case 'w':
 			errno = 0;
 			val = strtol(optarg, &ptr, 0);
-			if ( ptr == optarg || errno == ERANGE || val == LONG_MAX || val == LONG_MIN) {
+			if (ptr == optarg || errno == ERANGE || val == LONG_MAX || val == LONG_MIN || val < 0)
 				fprintf(stderr, "Invalid picture size value: %s\n", optarg);
-			} else {
+			else
 				svg_size = val;
-			}
 			break;
 		default:
 			fprintf(stderr, "Unknown option: %c\n", opt);
@@ -419,7 +418,8 @@ int main(int argc, char *argv[])
 		help_die(argv[0]);
 	if (opt_palette == NULL)
 		help_die(argv[0]);
-	// Testing the existence of the file with access() is not reliable
+	// Testing the existence of the file with access() is not reliable as it
+	// does not guarantee that the file is writeable
 	if ( (opt_output != NULL) && (access(opt_output, F_OK) == 0) && !opt_force) {
 		fprintf(stderr, "%s already exists, use option -f to overwrite\n", opt_output);
 		exit(EXIT_FAILURE);
