@@ -792,7 +792,6 @@ int main(int argc, char *argv[])
 
 	// free() !
 
-	hdestroy();
 	for (size_t i = 0; i < pattern_list->len; i += 1) {
 		pattern *pat = &g_array_index(pattern_list, pattern, i);
 		g_array_free(pat->points, TRUE);
