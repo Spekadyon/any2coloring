@@ -19,6 +19,11 @@
 
 // strdup(), getopt()
 #define _POSIX_C_SOURCE 200809L
+// asprintf
+#define _GNU_SOURCE
+
+#include <sys/types.h>
+#include <sys/wait.h>
 
 #include <errno.h>
 #include <libgen.h>
@@ -32,6 +37,8 @@
 
 #include <glib.h>
 #include <tiffio.h>
+
+#define TMPNAME	".any2coloring"
 
 struct color_s {
 	uint8_t R;
@@ -364,10 +371,13 @@ int main(int argc, char *argv[])
 	char *opt_output = NULL;
 	char *opt_soluce = NULL;
 	char *opt_palette = NULL;
+	int svg_size = 88;
 	bool opt_force = false;
 	int opt;
 
-	while ( (opt = getopt(argc, argv, "i:o:s:fp:")) != -1 ) {
+	while ( (opt = getopt(argc, argv, "i:o:s:fp:w:")) != -1 ) {
+		char *ptr;
+		long int val;
 		switch (opt) {
 		case 'i':
 			opt_input = optarg;
@@ -383,6 +393,15 @@ int main(int argc, char *argv[])
 			break;
 		case 'p':
 			opt_palette = optarg;
+			break;
+		case 'w':
+			errno = 0;
+			val = strtol(optarg, &ptr, 0);
+			if ( ptr == optarg || errno == ERANGE || val == LONG_MAX || val == LONG_MIN) {
+				fprintf(stderr, "Invalid picture size value: %s\n", optarg);
+			} else {
+				svg_size = val;
+			}
 			break;
 		default:
 			fprintf(stderr, "Unknown option: %c\n", opt);
@@ -440,6 +459,111 @@ int main(int argc, char *argv[])
 
 	fclose(fp);
 
+	/*
+	 * Generate palette file
+	 */
+
+	char palette_file[] = TMPNAME "XXXXXX";
+	char gmic_output[] = TMPNAME "XXXXXX";
+	int fd;
+
+	fd = mkstemp(gmic_output);
+	if (fd == 0) {
+		fprintf(stderr, "Unable to create temp file: %s\n", strerror(errno));
+		exit(EXIT_FAILURE);
+	}
+	close(fd);
+
+	fd = mkstemp(palette_file);
+	if (fd == 0) {
+		fprintf(stderr, "Unable to create temp file: %s\n", strerror(errno));
+		exit(EXIT_FAILURE);
+	};
+
+	fp = fdopen(fd, "w");
+	if (fp == NULL) {
+		fprintf(stderr, "Unable to fdopen() temp file: %s\n", strerror(errno));
+		exit(EXIT_FAILURE);
+	}
+
+	fprintf(fp, "P3\n");
+	fprintf(fp, "%d 1\n", color_palette->len);
+	fprintf(fp, "255\n");
+	for (size_t i = 0; i < color_palette->len; i += 1) {
+		palette *elt = &g_array_index(color_palette, palette, i);
+		fprintf(fp, "%hhu %hhu %hhu\n", elt->color.R, elt->color.G, elt->color.B);
+	}
+
+	fclose(fp);
+	close(fd);
+
+	pid_t pid;
+	if ( (pid = fork()) == -1 ) {
+		fprintf(stderr, "Unable to fork(): %s\n", strerror(errno));
+		exit(EXIT_FAILURE);
+	}
+	if (pid == 0) {
+#define SIZE		"88"
+#define PIECE_SZ	"8"
+#define COMPLEXITY	"3"
+#define RELIEF_AMP	"0"
+#define RELIEF_SZ	"0"
+#define OUTLINE		"1"
+		char *str = NULL;
+		char *svg_size_str1= NULL;
+		char *svg_size_str2= NULL;
+		int err;
+
+		err = asprintf(&str, "tiff:%s,uchar", gmic_output);
+		if (err == -1) {
+			fprintf(stderr, "Unable to allocate memory for string: %s\n", strerror(errno));
+			exit(EXIT_FAILURE);
+		}
+
+		err = asprintf(&svg_size_str1, "{min(%d,w)}", svg_size);
+		if (err == -1) {
+			fprintf(stderr, "Unable to allocate memory for string: %s\n", strerror(errno));
+			exit(EXIT_FAILURE);
+		}
+
+		err = asprintf(&svg_size_str2, "{min(%d,h)}", svg_size);
+		if (err == -1) {
+			fprintf(stderr, "Unable to allocate memory for string: %s\n", strerror(errno));
+			exit(EXIT_FAILURE);
+		}
+
+		char * cmdline[] = {
+			"gmic",
+			"-input", opt_input,
+			"-if", "{w>h}", "-r2dx", svg_size_str1 , "-else", "-r2dy", svg_size_str2, "-endif",
+			"-split_opacity", "-l[0]",
+			"-input", palette_file, "-index[-2]", "[-1],1",
+			"[0],[0],1,1", "-rand[2]", "0,1", "-dilate[2]", COMPLEXITY, "-+[0,2]",
+			"-r[0]", PIECE_SZ "\"\"00%," PIECE_SZ "\"\"00%",
+			"--g[0]", "xy,1", "-!=[-2,-1]", "0", "--f[0]", "'i(x+1,y+1)-i(x,y)'", "-!=[-3--1]", "0", "-|[-3--1]",
+			"-z[0,-1]", "0,0,{w-2},{h-2}",
+			"-if", OUTLINE, "[-1]", "-endif",
+			"--shift[-1]", "1,1", "-*[-2]", "-1", "-+[-2,-1]", "-b[-1]", "{"RELIEF_SZ  "*" PIECE_SZ "/5}", "-n[-1]", "-" RELIEF_AMP "," RELIEF_AMP,
+			"-map[0]", "[1]", "-rm[1]", "-+[0,-1]",
+			"-if", OUTLINE, "-==[1]", "0", "-*", "-endif",
+			"-endl", "-r[-1]", "[0],[0],1,100%", "-a", "c",
+			"-c", "0,255",
+			"-output", str,
+			NULL,
+		};
+		execvp(cmdline[0], cmdline);
+	}
+
+	int status;
+	waitpid(pid, &status, 0);
+	if (WEXITSTATUS(status) != 0) {
+		fprintf(stderr, "gmic return error %ld\n", (long int)WEXITSTATUS(status));
+		exit(EXIT_FAILURE);
+	}
+
+	// Palette no longer required
+	unlink(palette_file);
+
 
 	/*
 	 * TIFF/Open/Read/etc.
@@ -447,9 +571,12 @@ int main(int argc, char *argv[])
 
 	picture *pic;
 
-	pic = picture_read(opt_input);
+	pic = picture_read(gmic_output);
 	if (pic == NULL)
 		exit(EXIT_FAILURE);
+
+	// picture temp file no longer required
+	unlink(gmic_output);
 
 
 	/*
