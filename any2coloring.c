@@ -111,11 +111,17 @@ void help_die(char *str)
 	fprintf(stderr, "Usage\n");
 	fprintf(stderr, "\t%s [options] -i image.png -p palette.csv [-o output.svg]\n", basename(str));
 	fprintf(stderr, "\n");
-	fprintf(stderr, "Options:\n");
-	fprintf(stderr, "\t-i <arg>\tinput image file (mandatory)\n");
-	fprintf(stderr, "\t-p <arg>\tpalette (colors)\n");
-	fprintf(stderr, "\t-o <arg>\toutput file\n");
+	fprintf(stderr, "Description\n");
+	fprintf(stderr, "\tTransform any image supported by gmic into a coloring picture.\n");
+	fprintf(stderr, "\tColors are indexed and numeroted using palette.csv.\n");
+	fprintf(stderr, "\n");
+	fprintf(stderr, "Options\n");
 	fprintf(stderr, "\t-f\t\toverwrite output file\n");
+	fprintf(stderr, "\t-h\t\tprint this message\n");
+	fprintf(stderr, "\t-i <arg>\tinput image file (mandatory)\n");
+	fprintf(stderr, "\t-o <arg>\toutput file\n");
+	fprintf(stderr, "\t-p <arg>\tpalette (colors, mandatory)\n");
+	fprintf(stderr, "\t-w int\t\toutput image size (width or height)\n");
 	exit(EXIT_FAILURE);
 }
 
@@ -375,10 +381,13 @@ int main(int argc, char *argv[])
 	bool opt_force = false;
 	int opt;
 
-	while ( (opt = getopt(argc, argv, "i:o:s:fp:w:")) != -1 ) {
+	while ( (opt = getopt(argc, argv, "i:o:s:fp:w:h")) != -1 ) {
 		char *ptr;
 		long int val;
 		switch (opt) {
+		case 'h':
+			help_die(argv[0]);
+			break;
 		case 'i':
 			opt_input = optarg;
 			break;
