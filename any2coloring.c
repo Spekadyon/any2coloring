@@ -27,6 +27,7 @@
 
 #include <errno.h>
 #include <libgen.h>
+#include <regex.h>
 #include <search.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -49,7 +50,7 @@ struct color_s {
 struct palette_s {
 	struct color_s color;
 	uint32_t hex;
-	int num;
+	char *tag;
 };
 
 struct pixel_s {
@@ -99,6 +100,8 @@ pixel picture_get_pixel(const picture *pic, point pt);
 picture *picture_allocate(size_t width, size_t height);
 void picture_free(picture *pic);
 const char *color2str(color col);
+void strchomp(char *str);
+void regex_err_print(int err, regex_t *regex);
 
 
 /*
@@ -142,7 +145,7 @@ bool color_compare(color A, color B)
 }
 
 
-int palette_color2num(const GArray *pal, color clr)
+const char *palette_color2tag(const GArray *pal, color clr)
 {
 	for (size_t i = 0; i < pal->len; i += 1) {
 		palette *elt;
@@ -150,10 +153,17 @@ int palette_color2num(const GArray *pal, color clr)
 		elt = &g_array_index(pal, struct palette_s, i);
 
 		if (color_compare(elt->color, clr)) {
-			return elt->num;
+			return elt->tag;
 		}
 	}
-	return -1;
+	return NULL;
+}
+
+void palette_array_free(GArray *palette_array)
+{
+	for (size_t i = 0; i < palette_array->len; i += 1)
+		free(g_array_index(palette_array, struct palette_s, i).tag);
+	g_array_free(palette_array, TRUE);
 }
 
 /*
@@ -169,7 +179,19 @@ GArray *palette_read(const char *str)
 	char *line = NULL;
 	size_t len = 0;
 	ssize_t read;
+	int err;
 
+	regex_t regex_compiled;
+	regmatch_t regex_match[3];
+
+	// Regex compilation
+	err = regcomp(&regex_compiled, "^([0-9A-Fa-f]{6})\\s(\\w+)$", REG_EXTENDED);
+	if (err) {
+		regex_err_print(err, &regex_compiled);
+		goto palette_read_regex;
+	}
+
+	// Palette open()
 	fp = fopen(str, "r");
 	if (fp == NULL) {
 		fprintf(stderr, "Unable to open palette file %s: %s\n", str, strerror(errno));
@@ -183,21 +205,49 @@ GArray *palette_read(const char *str)
 		goto palette_read_array_new;
 	}
 
+	// Palette read()
 	while ( (read = getline(&line, &len, fp)) != -1 ) {
 		unsigned int color;
-		int number;
+		char *tag;
+		char *endptr;
+		/*ssize_t substr_len;*/
 
-		if (sscanf(line, "%x\t%d", &color, &number) == 2) {
-			struct color_s col;
-			col = (struct color_s) {
-				.R = (color >> 16) & 0xFF,
-				.G = (color >> 8 ) & 0xFF,
-				.B = (color)       & 0xFF
-			};
-			palette tmp = {.color = col, .hex = color, .num = number};
-			g_array_append_val(color_palette, tmp);
+		strchomp(line);
+
+		err = regexec(&regex_compiled, line, 3, regex_match, 0);
+		if (err) {
+			// err == REG_NOMATCH, cf. man page
+			fprintf(stderr, "palette_read(): invalid line: %s\n", line);
+			continue;
 		}
+
+		errno = 0;
+		color = strtoul(line+regex_match[1].rm_so, &endptr, 16);
+		if (errno) {
+			fprintf(stderr, "Unable to extract color from line %s: %s\n", line, strerror(errno));
+			continue;
+		}
+		if (endptr == line+regex_match[1].rm_so) {
+			fprintf(stderr, "Unable to extract color from line %s\n", line);
+			continue;
+		}
+
+		tag = strndup(line+regex_match[2].rm_so, regex_match[2].rm_eo - regex_match[2].rm_so);
+		if (tag == NULL) {
+			fprintf(stderr, "Unable to allocate memory for string: %s\n", strerror(errno));
+			goto palette_read_str_malloc;
+		}
+
+		struct color_s col;
+		col = (struct color_s) {
+			.R = (color >> 16) & 0xFF,
+			.G = (color >> 8 ) & 0xFF,
+			.B = (color)       & 0xFF
+		};
+		palette tmp = {.color = col, .hex = color, .tag = tag };
+		g_array_append_val(color_palette, tmp);
 	}
+
 
 	if (line)
 		free(line);
@@ -209,10 +259,18 @@ GArray *palette_read(const char *str)
 	}
 
 	fclose(fp);
+	regfree(&regex_compiled);
 
-palette_read_array_new:
-palette_read_open:
 	return color_palette;
+
+palette_read_str_malloc:
+	palette_array_free(color_palette);
+palette_read_array_new:
+	fclose(fp);
+palette_read_open:
+	regfree(&regex_compiled);
+palette_read_regex:
+	return NULL;
 }
 
 int palette_gen(const GArray *color_palette, int fd)
@@ -601,7 +659,7 @@ int pattern_to_svg(const char *output, const GArray *pattern_list, const GArray 
 		fprintf(fp, "%d %d", pt->x, pt->y);
 		fprintf(fp, "\"/>\n");
 		fprintf(fp, "\t<text x=\"%g\" y=\"%g\" font-size=\"4.75\" font-family=\"Nimbus Sans L\" style=\"fill: dimgray\">", pt->x-0.1, (double)(pt->y+7));
-		fprintf(fp, "%d", palette_color2num(color_palette, pattern_current->color));
+		fprintf(fp, "%s", palette_color2tag(color_palette, pattern_current->color));
 
 		fprintf(fp, "</text>\n");
 	}
@@ -627,6 +685,17 @@ const char *color2str(color col)
 	snprintf(str, sizeof(str), "#%02hhx%02hhx%02hhx",
 		 col.R, col.G, col.B);
 	return str;
+}
+
+void strchomp(char *str)
+{
+	while (str) {
+		if (*str == '\n') {
+			*str = '\0';
+			break;
+		}
+		str++;
+	}
 }
 
 int gmic_launch(char *input, char *output, char *palette, int svg_size)
@@ -692,6 +761,25 @@ gmic_launch_err1:
 	return -1;
 }
 
+void regex_err_print(int err, regex_t *regex)
+{
+	int len;
+	char *str;
+
+	len = regerror(err, regex, NULL, 0);
+	str = malloc(len);
+
+	if (str == NULL) {
+		fprintf(stderr, "Unable to allocate memory for regex error message: %s\n", strerror(errno));
+		return;
+	}
+
+	regerror(err, regex, str, len);
+	fprintf(stderr, "Regex compile error: %s\n", str);
+	free(str);
+
+	return;
+}
 
 /*
  * Main
@@ -861,7 +949,7 @@ int main(int argc, char *argv[])
 		g_array_free(pat->points, TRUE);
 	}
 	g_array_free(pattern_list, TRUE);
-	g_array_free(color_palette, TRUE);
+	palette_array_free(color_palette);
 
 	return EXIT_SUCCESS;
 }
