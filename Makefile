@@ -1,8 +1,9 @@
-CC=gcc
-#CFLAGS=-Og -g3 -ggdb -std=c99
-#LDFLAGS=-g3 -ggdb -lm -ltiff
-CFLAGS=-O3 -march=native -g3 -ggdb -std=c99
-LDFLAGS=-Wl,-O1 -g3 -ggdb -lm
+CC?=gcc
+CFLAGS?=-O3 -march=native -g3 -ggdb -std=c99 -fwhole-program
+LDFLAGS?=-Wl,-O1 -g3 -ggdb
+
+LDFLAGS+=-lm
+
 PKG_CONFIG_MODULES=glib-2.0 libtiff-4
 CFLAGS+=`pkg-config --cflags $(PKG_CONFIG_MODULES)`
 LDFLAGS+=`pkg-config --libs $(PKG_CONFIG_MODULES)`
@@ -12,6 +13,8 @@ HEAD=
 
 BINARY=any2coloring
 OBJS= $(SRC:.c=.o)
+
+.PHONY: clean strip all
 
 all: $(BINARY)
 
