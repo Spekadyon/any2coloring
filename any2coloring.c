@@ -157,6 +157,92 @@ int palette_color2num(const GArray *pal, color clr)
 }
 
 /*
+ * Reading palette
+ * Must be a tab separated-value files, with hex color in the first
+ * color and unique numbers in the second one
+ */
+
+GArray *palette_read(const char *str)
+{
+	GArray *color_palette = NULL;
+	FILE *fp;
+	char *line = NULL;
+	size_t len = 0;
+	ssize_t read;
+
+	fp = fopen(str, "r");
+	if (fp == NULL) {
+		fprintf(stderr, "Unable to open palette file %s: %s\n", str, strerror(errno));
+		goto palette_read_open;
+	}
+
+	color_palette = g_array_new(FALSE, FALSE, sizeof(palette));
+
+	if (color_palette == NULL) {
+		fprintf(stderr, "Unable to allocate memory for the palette\n");
+		goto palette_read_array_new;
+	}
+
+	while ( (read = getline(&line, &len, fp)) != -1 ) {
+		unsigned int color;
+		int number;
+
+		if (sscanf(line, "%x\t%d", &color, &number) == 2) {
+			struct color_s col;
+			col = (struct color_s) {
+				.R = (color >> 16) & 0xFF,
+				.G = (color >> 8 ) & 0xFF,
+				.B = (color)       & 0xFF
+			};
+			palette tmp = {.color = col, .hex = color, .num = number};
+			g_array_append_val(color_palette, tmp);
+		}
+	}
+
+	if (line)
+		free(line);
+
+	if (color_palette->len == 0) {
+		fprintf(stderr, "Unable to read valid palette data from %s\n", str);
+		g_array_free(color_palette, TRUE);
+		color_palette = NULL;
+	}
+
+	fclose(fp);
+
+palette_read_array_new:
+palette_read_open:
+	return color_palette;
+}
+
+int palette_gen(const GArray *color_palette, int fd)
+{
+	FILE *fp;
+	int err = 0;
+
+	if ( (fp = fdopen(fd, "w")) == NULL ) {
+		fprintf(stderr, "Unable to fdopen() temp file: %s\n", strerror(errno));
+		err = -1;
+		goto palette_gen_fdopen;
+	}
+
+	fprintf(fp, "P3\n");
+	fprintf(fp, "%d 1\n", color_palette->len);
+	fprintf(fp, "255\n");
+	for (size_t i = 0; i < color_palette->len; i += 1) {
+		palette *elt = &g_array_index(color_palette, palette, i);
+		fprintf(fp, "%hhu %hhu %hhu\n", elt->color.R, elt->color.G, elt->color.B);
+	}
+
+	fclose(fp);
+
+palette_gen_fdopen:
+	return err;
+}
+
+
+
+/*
  * Pixel-related functions
  */
 
@@ -344,253 +430,19 @@ picture_read_tiff:
 
 }
 
-
 /*
- * Other functions
+ * Picture analysis functions
  */
 
-const char *color2str(color col)
+GArray *picture_analysis(picture *pic)
 {
-	static char str[16];
-	snprintf(str, sizeof(str), "#%02hhx%02hhx%02hhx",
-		 col.R, col.G, col.B);
-	return str;
-}
-
-
-/*
- * Main
- */
-
-int main(int argc, char *argv[])
-{
-	FILE *fp;
-
-	/*
-	 * Opts
-	 */
-
-	char *opt_input = NULL;
-	char *opt_output = NULL;
-	char *opt_soluce = NULL;
-	char *opt_palette = NULL;
-	int svg_size = 88;
-	bool opt_force = false;
-	int opt;
-
-	while ( (opt = getopt(argc, argv, "i:o:s:fp:w:h")) != -1 ) {
-		char *ptr;
-		long int val;
-		switch (opt) {
-		case 'h':
-			help_die(argv[0]);
-			break;
-		case 'i':
-			opt_input = optarg;
-			break;
-		case 'o':
-			opt_output = optarg;
-			break;
-		case 's':
-			opt_soluce = optarg;
-			break;
-		case 'f':
-			opt_force = true;
-			break;
-		case 'p':
-			opt_palette = optarg;
-			break;
-		case 'w':
-			errno = 0;
-			val = strtol(optarg, &ptr, 0);
-			if (ptr == optarg || errno == ERANGE || val == LONG_MAX || val == LONG_MIN || val < 0)
-				fprintf(stderr, "Invalid picture size value: %s\n", optarg);
-			else
-				svg_size = val;
-			break;
-		default:
-			fprintf(stderr, "Unknown option: %c\n", opt);
-		}
-	}
-
-	// mandatory options
-	if (opt_input == NULL)
-		help_die(argv[0]);
-	if (opt_palette == NULL)
-		help_die(argv[0]);
-	// Testing the existence of the file with access() is not reliable as it
-	// does not guarantee that the file is writeable
-	if ( (opt_output != NULL) && (access(opt_output, F_OK) == 0) && !opt_force) {
-		fprintf(stderr, "%s already exists, use option -f to overwrite\n", opt_output);
-		exit(EXIT_FAILURE);
-	}
-	if ( (opt_soluce != NULL) && (access(opt_soluce, F_OK) == 0) && !opt_force) {
-		fprintf(stderr, "%s already exists, use option -f to overwrite\n", opt_soluce);
-		exit(EXIT_FAILURE);
-	}
-
-	/*
-	 * Reading palette
-	 * Must be a tab separated-value files, with hex color in the first
-	 * color and unique numbers in the second one
-	 */
-
-	fp = fopen(opt_palette, "r");
-	if (fp == NULL) {
-		fprintf(stderr, "Unable to open palette file %s: %s\n", opt_palette, strerror(errno));
-		exit(EXIT_FAILURE);
-	}
-
-	GArray *color_palette;
-	color_palette = g_array_new(FALSE, FALSE, sizeof(palette));
-
-	char *line = NULL;
-	size_t len = 0;
-	ssize_t read;
-	while ( (read = getline(&line, &len, fp)) != -1 ) {
-		unsigned int color;
-		int number;
-
-		if (sscanf(line, "%x\t%d", &color, &number) == 2) {
-			struct color_s col;
-			col = (struct color_s) {
-				.R = (color >> 16) & 0xFF,
-				.G = (color >> 8 ) & 0xFF,
-				.B = (color)       & 0xFF
-			};
-			palette tmp = {.color = col, .hex = color, .num = number};
-			g_array_append_val(color_palette, tmp);
-		}
-	}
-
-	fclose(fp);
-
-	/*
-	 * Generate palette file
-	 */
-
-	char palette_file[] = TMPNAME "XXXXXX";
-	char gmic_output[] = TMPNAME "XXXXXX";
-	int fd;
-
-	fd = mkstemp(gmic_output);
-	if (fd == 0) {
-		fprintf(stderr, "Unable to create temp file: %s\n", strerror(errno));
-		exit(EXIT_FAILURE);
-	}
-	close(fd);
-
-	fd = mkstemp(palette_file);
-	if (fd == 0) {
-		fprintf(stderr, "Unable to create temp file: %s\n", strerror(errno));
-		exit(EXIT_FAILURE);
-	};
-
-	fp = fdopen(fd, "w");
-	if (fp == NULL) {
-		fprintf(stderr, "Unable to fdopen() temp file: %s\n", strerror(errno));
-		exit(EXIT_FAILURE);
-	}
-
-	fprintf(fp, "P3\n");
-	fprintf(fp, "%d 1\n", color_palette->len);
-	fprintf(fp, "255\n");
-	for (size_t i = 0; i < color_palette->len; i += 1) {
-		palette *elt = &g_array_index(color_palette, palette, i);
-		fprintf(fp, "%hhu %hhu %hhu\n", elt->color.R, elt->color.G, elt->color.B);
-	}
-
-	fclose(fp);
-	close(fd);
-
-	pid_t pid;
-	if ( (pid = fork()) == -1 ) {
-		fprintf(stderr, "Unable to fork(): %s\n", strerror(errno));
-		exit(EXIT_FAILURE);
-	}
-	if (pid == 0) {
-#define SIZE		"88"
-#define PIECE_SZ	"8"
-#define COMPLEXITY	"3"
-#define RELIEF_AMP	"0"
-#define RELIEF_SZ	"0"
-#define OUTLINE		"1"
-		char *str = NULL;
-		char *svg_size_str1= NULL;
-		char *svg_size_str2= NULL;
-		int err;
-
-		err = asprintf(&str, "tiff:%s,uchar", gmic_output);
-		if (err == -1) {
-			fprintf(stderr, "Unable to allocate memory for string: %s\n", strerror(errno));
-			exit(EXIT_FAILURE);
-		}
-
-		err = asprintf(&svg_size_str1, "{min(%d,w)}", svg_size);
-		if (err == -1) {
-			fprintf(stderr, "Unable to allocate memory for string: %s\n", strerror(errno));
-			exit(EXIT_FAILURE);
-		}
-
-		err = asprintf(&svg_size_str2, "{min(%d,h)}", svg_size);
-		if (err == -1) {
-			fprintf(stderr, "Unable to allocate memory for string: %s\n", strerror(errno));
-			exit(EXIT_FAILURE);
-		}
-
-		char * cmdline[] = {
-			"gmic",
-			"-input", opt_input,
-			"-if", "{w>h}", "-r2dx", svg_size_str1 , "-else", "-r2dy", svg_size_str2, "-endif",
-			"-split_opacity", "-l[0]",
-			"-input", palette_file, "-index[-2]", "[-1],1",
-			"[0],[0],1,1", "-rand[2]", "0,1", "-dilate[2]", COMPLEXITY, "-+[0,2]",
-			"-r[0]", PIECE_SZ "\"\"00%," PIECE_SZ "\"\"00%",
-			"--g[0]", "xy,1", "-!=[-2,-1]", "0", "--f[0]", "'i(x+1,y+1)-i(x,y)'", "-!=[-3--1]", "0", "-|[-3--1]",
-			"-z[0,-1]", "0,0,{w-2},{h-2}",
-			"-if", OUTLINE, "[-1]", "-endif",
-			"--shift[-1]", "1,1", "-*[-2]", "-1", "-+[-2,-1]", "-b[-1]", "{"RELIEF_SZ  "*" PIECE_SZ "/5}", "-n[-1]", "-" RELIEF_AMP "," RELIEF_AMP,
-			"-map[0]", "[1]", "-rm[1]", "-+[0,-1]",
-			"-if", OUTLINE, "-==[1]", "0", "-*", "-endif",
-			"-endl", "-r[-1]", "[0],[0],1,100%", "-a", "c",
-			"-c", "0,255",
-			"-output", str,
-			NULL,
-		};
-		execvp(cmdline[0], cmdline);
-	}
-
-	int status;
-	waitpid(pid, &status, 0);
-	if (WEXITSTATUS(status) != 0) {
-		fprintf(stderr, "gmic return error %ld\n", (long int)WEXITSTATUS(status));
-		exit(EXIT_FAILURE);
-	}
-
-	// Palette no longer required
-	unlink(palette_file);
-
-
-	/*
-	 * TIFF/Open/Read/etc.
-	 */
-
-	picture *pic;
-
-	pic = picture_read(gmic_output);
-	if (pic == NULL)
-		exit(EXIT_FAILURE);
-
-	// picture temp file no longer required
-	unlink(gmic_output);
-
-
-	/*
-	 * Image parsing
-	 */
-
 	GArray *pattern_list;
+
 	pattern_list = g_array_new(FALSE, FALSE, sizeof(pattern));
+	if (pattern_list == NULL) {
+		fprintf(stderr, "Unable to allocate memory for pattern_list\n");
+		return NULL;
+	}
 
 	// gmic output: colored zoned oulined with black lines. The width of the
 	// colored zones is at least 2 pixel large. The outline of each zone is
@@ -694,7 +546,6 @@ int main(int argc, char *argv[])
 					direction = point_rotate_left(direction);
 				}
 
-				/*printf("%d\t%d\n", position.x, position.y);*/
 				dir_neighbour = point_rotate_right(direction);
 
 				pixel_set_checked(pic, position, true);
@@ -705,24 +556,27 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	picture_free(pic);
+	return pattern_list;
+}
 
-	/*
-	 * SVG output
-	 */
+/*
+ * SVG Generation functions
+ */
 
-	// Output files
+int pattern_to_svg(const char *output, const GArray *pattern_list, const GArray *color_palette, bool soluce)
+{
+	FILE *fp;
 
-
-	if (opt_output) {
-		fp = fopen(opt_output, "w");
+	if (output) {
+		fp = fopen(output, "w");
 		if (fp == NULL) {
-			fprintf(stderr, "Unabel to write to file %s: %s\n", opt_output,
-				strerror(errno));
-			exit(EXIT_FAILURE);
+			fprintf(stderr, "Unabel to write to file %s: %s\n", output, strerror(errno));
+			return -1;
 		}
-	} else {
+	} else if (!soluce) {
 		fp = stdout;
+	} else {
+		return 0;
 	}
 
 	// SVG !
@@ -732,7 +586,7 @@ int main(int argc, char *argv[])
 	for (size_t idx = 0; idx < pattern_list->len; idx += 1) {
 		pattern *pattern_current;
 		pattern_current = &g_array_index(pattern_list, pattern, idx);
-		fprintf(fp, "\t<polygon style=\"fill: %s; stroke: lightgrey; stroke-width: .5px\" points=\"", "white");
+		fprintf(fp, "\t<polygon style=\"fill: %s; stroke: lightgrey; stroke-width: .5px\" points=\"", soluce ? color2str(pattern_current->color) : "white");
 		for (size_t edge = 0; edge < pattern_current->points->len; edge += 1) {
 			point *pt = &g_array_index(pattern_current->points, point, edge);
 			fprintf(fp, "%d %d, ", pt->x, pt->y);
@@ -753,42 +607,246 @@ int main(int argc, char *argv[])
 	if (fp != stdout)
 		fclose(fp);
 
-	// Soluce
+	return 0;
+}
 
-	if (opt_soluce) {
-		fp = fopen(opt_soluce, "w");
-		if (fp == NULL) {
-			fprintf(stderr, "Unabel to write to file %s: %s\n", opt_soluce, strerror(errno));
-			exit(EXIT_FAILURE);
-		}
 
-		// SVG !
+/*
+ * Other functions
+ */
 
-		fprintf(fp, "<svg version=\"1.1\"\nbaseProfile=\"full\"\nwidth=\"300\" height=\"200\"\nxmlns=\"http://www.w3.org/2000/svg\">\n");
+const char *color2str(color col)
+{
+	static char str[16];
+	snprintf(str, sizeof(str), "#%02hhx%02hhx%02hhx",
+		 col.R, col.G, col.B);
+	return str;
+}
 
-		for (size_t idx = 0; idx < pattern_list->len; idx += 1) {
-			pattern *pattern_current;
-			pattern_current = &g_array_index(pattern_list, pattern, idx);
-			fprintf(fp, "\t<polygon style=\"fill: %s; stroke: lightgrey; stroke-width: .5px\" points=\"", color2str(pattern_current->color));
-			for (size_t edge = 0; edge < pattern_current->points->len; edge += 1) {
-				point *pt = &g_array_index(pattern_current->points, point, edge);
-				fprintf(fp, "%d %d, ", pt->x, pt->y);
-			}
-			point *pt = &g_array_index(pattern_current->points, point, 0);
-			fprintf(fp, "%d %d", pt->x, pt->y);
-			fprintf(fp, "\"/>\n");
-			fprintf(fp, "\t<text x=\"%g\" y=\"%g\" font-size=\"4.75\" font-family=\"Nimbus Sans L\" style=\"fill: dimgray\">", pt->x-0.1, (double)(pt->y+7));
+int gmic_launch(char *input, char *output, char *palette, int svg_size)
+{
+#define PIECE_SZ	"8"
+#define COMPLEXITY	"3"
+#define RELIEF_AMP	"0"
+#define RELIEF_SZ	"0"
+#define OUTLINE		"1"
+	char *str = NULL;
+	char *svg_size_str1= NULL;
+	char *svg_size_str2= NULL;
+	int err;
 
-			fprintf(fp, "%d", palette_color2num(color_palette, pattern_current->color));
-			fprintf(fp, "</text>\n");
-		}
-
-		fprintf(fp, "</svg>\n");
-
-		// output file close
-
-		fclose(fp);
+	err = asprintf(&str, "tiff:%s,uchar", output);
+	if (err == -1) {
+		fprintf(stderr, "Unable to allocate memory for string: %s\n", strerror(errno));
+		goto gmic_launch_err1;
 	}
+
+	err = asprintf(&svg_size_str1, "{min(%d,w)}", svg_size);
+	if (err == -1) {
+		fprintf(stderr, "Unable to allocate memory for string: %s\n", strerror(errno));
+		goto gmic_launch_err2;
+	}
+
+	err = asprintf(&svg_size_str2, "{min(%d,h)}", svg_size);
+	if (err == -1) {
+		fprintf(stderr, "Unable to allocate memory for string: %s\n", strerror(errno));
+		goto gmic_launch_err3;
+	}
+
+	char *cmdline[] = {
+		"gmic",
+		"-input", input,
+		"-if", "{w>h}", "-r2dx", svg_size_str1 , "-else", "-r2dy", svg_size_str2, "-endif",
+		"-split_opacity", "-l[0]",
+		"-input", palette, "-index[-2]", "[-1],1",
+		"[0],[0],1,1", "-rand[2]", "0,1", "-dilate[2]", COMPLEXITY, "-+[0,2]",
+		"-r[0]", PIECE_SZ "\"\"00%," PIECE_SZ "\"\"00%",
+		"--g[0]", "xy,1", "-!=[-2,-1]", "0", "--f[0]", "'i(x+1,y+1)-i(x,y)'", "-!=[-3--1]", "0", "-|[-3--1]",
+		"-z[0,-1]", "0,0,{w-2},{h-2}",
+		"-if", OUTLINE, "[-1]", "-endif",
+		"--shift[-1]", "1,1", "-*[-2]", "-1", "-+[-2,-1]", "-b[-1]", "{"RELIEF_SZ  "*" PIECE_SZ "/5}", "-n[-1]", "-" RELIEF_AMP "," RELIEF_AMP,
+		"-map[0]", "[1]", "-rm[1]", "-+[0,-1]",
+		"-if", OUTLINE, "-==[1]", "0", "-*", "-endif",
+		"-endl", "-r[-1]", "[0],[0],1,100%", "-a", "c",
+		"-c", "0,255",
+		"-output", str,
+		NULL,
+	};
+
+	execvp(cmdline[0], cmdline);
+
+	fprintf(stderr, "Unable to exec() gmic: %s\n", strerror(errno));
+
+	free(svg_size_str2);
+gmic_launch_err3:
+	free(svg_size_str1);
+gmic_launch_err2:
+	free(str);
+gmic_launch_err1:
+	return -1;
+}
+
+
+/*
+ * Main
+ */
+
+int main(int argc, char *argv[])
+{
+	GArray *color_palette;
+	GArray *pattern_list;
+	char palette_file[] = TMPNAME "XXXXXX";
+	char gmic_output[] = TMPNAME "XXXXXX";
+	int fd;
+
+	/*
+	 * Opts
+	 */
+
+	char *opt_input = NULL;
+	char *opt_output = NULL;
+	char *opt_soluce = NULL;
+	char *opt_palette = NULL;
+	int svg_size = 88;
+	bool opt_force = false;
+	int opt;
+
+	while ( (opt = getopt(argc, argv, "i:o:s:fp:w:h")) != -1 ) {
+		char *ptr;
+		long int val;
+		switch (opt) {
+		case 'h':
+			help_die(argv[0]);
+			break;
+		case 'i':
+			opt_input = optarg;
+			break;
+		case 'o':
+			opt_output = optarg;
+			break;
+		case 's':
+			opt_soluce = optarg;
+			break;
+		case 'f':
+			opt_force = true;
+			break;
+		case 'p':
+			opt_palette = optarg;
+			break;
+		case 'w':
+			errno = 0;
+			val = strtol(optarg, &ptr, 0);
+			if (ptr == optarg || errno == ERANGE || val == LONG_MAX || val == LONG_MIN || val < 0)
+				fprintf(stderr, "Invalid picture size value: %s\n", optarg);
+			else
+				svg_size = val;
+			break;
+		default:
+			fprintf(stderr, "Unknown option: %c\n", opt);
+		}
+	}
+
+	// mandatory options
+	if (opt_input == NULL)
+		help_die(argv[0]);
+	if (opt_palette == NULL)
+		help_die(argv[0]);
+	// Testing the existence of the file with access() is not reliable as it
+	// does not guarantee that the file is writeable
+	if ( (opt_output != NULL) && (access(opt_output, F_OK) == 0) && !opt_force) {
+		fprintf(stderr, "%s already exists, use option -f to overwrite\n", opt_output);
+		exit(EXIT_FAILURE);
+	}
+	if ( (opt_soluce != NULL) && (access(opt_soluce, F_OK) == 0) && !opt_force) {
+		fprintf(stderr, "%s already exists, use option -f to overwrite\n", opt_soluce);
+		exit(EXIT_FAILURE);
+	}
+
+	// Read palette
+	color_palette = palette_read(opt_palette);
+	if (color_palette == NULL)
+		exit(EXIT_FAILURE);
+
+	// Generate temporary files
+	fd = mkstemp(gmic_output);
+	if (fd == 0) {
+		fprintf(stderr, "Unable to create temp file: %s\n", strerror(errno));
+		exit(EXIT_FAILURE);
+	}
+	close(fd);
+
+	fd = mkstemp(palette_file);
+	if (fd == 0) {
+		fprintf(stderr, "Unable to create temp file: %s\n", strerror(errno));
+		exit(EXIT_FAILURE);
+	};
+
+	// Generate temporary palette file (ASCII pbm)
+	if (palette_gen(color_palette, fd) == -1)
+		exit(EXIT_FAILURE);
+
+	close(fd);
+
+	// Launch gmic (fork(), exec(), etc.)
+	pid_t pid;
+	if ( (pid = fork()) == -1 ) {
+		fprintf(stderr, "Unable to fork(): %s\n", strerror(errno));
+		exit(EXIT_FAILURE);
+	}
+	if (pid == 0) {
+		// child
+		gmic_launch(opt_input, gmic_output, palette_file, svg_size);
+		// The previous function returns only on malloc() or exec() error
+		exit(EXIT_FAILURE);
+	}
+
+	int status;
+	waitpid(pid, &status, 0);
+	if (WEXITSTATUS(status) != 0) {
+		fprintf(stderr, "gmic return error %ld\n", (long int)WEXITSTATUS(status));
+		exit(EXIT_FAILURE);
+	}
+
+	// Palette no longer required
+	unlink(palette_file);
+
+
+	/*
+	 * TIFF/Open/Read/etc.
+	 */
+
+	picture *pic;
+
+	pic = picture_read(gmic_output);
+	if (pic == NULL)
+		exit(EXIT_FAILURE);
+
+	// picture temp file no longer required
+	unlink(gmic_output);
+
+
+	/*
+	 * Image parsing
+	 */
+
+	pattern_list = picture_analysis(pic);
+	if (pattern_list == NULL)
+		exit(EXIT_FAILURE);
+
+	picture_free(pic);
+
+	/*
+	 * SVG output
+	 */
+
+	if (pattern_to_svg(opt_output, pattern_list, color_palette, false))
+		exit(EXIT_FAILURE);
+	if (opt_soluce)
+		if (pattern_to_svg(opt_soluce, pattern_list, color_palette, true))
+			exit(EXIT_FAILURE);
+
+	// Output files
+
 
 	// free() !
 
