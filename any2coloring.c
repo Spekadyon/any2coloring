@@ -123,6 +123,7 @@ void help_die(char *str)
 	fprintf(stderr, "\t-i <arg>\tinput image file (mandatory)\n");
 	fprintf(stderr, "\t-o <arg>\toutput file\n");
 	fprintf(stderr, "\t-p <arg>\tpalette (colors, mandatory)\n");
+	fprintf(stderr, "\t-t <double>\ttext size in the svg output (defaults to 5.5)\n");
 	fprintf(stderr, "\t-w int\t\toutput image size (width or height)\n");
 	exit(EXIT_FAILURE);
 }
@@ -627,7 +628,7 @@ GArray *picture_analysis(picture *pic)
  * SVG Generation functions
  */
 
-int pattern_to_svg(const char *output, const GArray *pattern_list, const GArray *color_palette, bool soluce)
+int pattern_to_svg(const char *output, const GArray *pattern_list, const GArray *color_palette, bool soluce, double svg_text_size)
 {
 	FILE *fp;
 
@@ -658,7 +659,7 @@ int pattern_to_svg(const char *output, const GArray *pattern_list, const GArray 
 		point *pt = &g_array_index(pattern_current->points, point, 0);
 		fprintf(fp, "%d %d", pt->x, pt->y);
 		fprintf(fp, "\"/>\n");
-		fprintf(fp, "\t<text x=\"%g\" y=\"%g\" font-size=\"4.75\" font-family=\"Nimbus Sans L\" style=\"fill: dimgray\">", pt->x-0.1, (double)(pt->y+7));
+		fprintf(fp, "\t<text x=\"%g\" y=\"%g\" font-size=\"%g\" font-family=\"Nimbus Sans L\" style=\"fill: dimgray\">", (double)pt->x+0.75, (double)(pt->y+7), svg_text_size);
 		fprintf(fp, "%s", palette_color2tag(color_palette, pattern_current->color));
 
 		fprintf(fp, "</text>\n");
@@ -802,12 +803,15 @@ int main(int argc, char *argv[])
 	char *opt_soluce = NULL;
 	char *opt_palette = NULL;
 	int svg_size = 88;
+	double svg_text_size = 5.5;
 	bool opt_force = false;
 	int opt;
 
-	while ( (opt = getopt(argc, argv, "i:o:s:fp:w:h")) != -1 ) {
+	while ( (opt = getopt(argc, argv, "i:o:s:fp:w:ht:")) != -1 ) {
 		char *ptr;
 		long int val;
+		double dval;
+
 		switch (opt) {
 		case 'h':
 			help_die(argv[0]);
@@ -834,6 +838,14 @@ int main(int argc, char *argv[])
 				fprintf(stderr, "Invalid picture size value: %s\n", optarg);
 			else
 				svg_size = val;
+			break;
+		case 't':
+			errno = 0;
+			dval = strtod(optarg, &ptr);
+			if (ptr == optarg || errno == ERANGE || dval <= 0)
+				fprintf(stderr, "Invalid text size: %s\n", optarg);
+			else
+				svg_text_size = dval;
 			break;
 		default:
 			fprintf(stderr, "Unknown option: %c\n", opt);
@@ -933,10 +945,10 @@ int main(int argc, char *argv[])
 	 * SVG output
 	 */
 
-	if (pattern_to_svg(opt_output, pattern_list, color_palette, false))
+	if (pattern_to_svg(opt_output, pattern_list, color_palette, false, svg_text_size))
 		exit(EXIT_FAILURE);
 	if (opt_soluce)
-		if (pattern_to_svg(opt_soluce, pattern_list, color_palette, true))
+		if (pattern_to_svg(opt_soluce, pattern_list, color_palette, true, svg_text_size))
 			exit(EXIT_FAILURE);
 
 	// Output files
