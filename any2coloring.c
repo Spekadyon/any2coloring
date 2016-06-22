@@ -509,18 +509,17 @@ GArray *picture_analysis(picture *pic)
 				point dir_neighbour;
 				pixel px_neighbour;
 
-				// Si voisin à droite == pas noir, on tourne à
-				// droite
-				// If the next (neighbour) pixel on the right is
-				// not black, we turn on the right
+				// If the pixel on the right is not black → turn
+				// right
 				dir_neighbour = point_rotate_right(direction);
 				pt_neighbour = point_next(position, dir_neighbour);
 				px_neighbour = picture_get_pixel(pic, pt_neighbour);
 				if (!pixel_isblack(px_neighbour)) {
-					// Le coin correspondant est à -3
-					// pi/4... cf. dessin, je ne fais ici
-					// que mettre sqrt(2) fois la matrice de
-					// rotation correspondante
+					// Next vertex is located at an angle of
+					// -3π/4 related to the current
+					// direction. Using here the rotation
+					// matrix ( [-1, -1], [1, -1] ) to
+					// obtain its coordinates
 					point edge_dir;
 					point edge_pos;
 					edge_dir.x = -direction.x + direction.y;
@@ -530,9 +529,10 @@ GArray *picture_analysis(picture *pic)
 
 					direction = point_rotate_right(direction);
 				}
-				// SI le pixel en face est noir, on tourne à
-				// droite == mur
-				// Le coin est situé à -pi/4 de la direction
+				// If next (forward) pixel is black, turnleft
+				// (the black line is on the right)
+				// Vertex is located at an angle of -π/4,
+				// related to the current direction
 				dir_neighbour = direction;
 				pt_neighbour = point_next(position, dir_neighbour);
 				px_neighbour = picture_get_pixel(pic, pt_neighbour);
