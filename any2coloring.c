@@ -341,17 +341,15 @@ picture *picture_allocate(size_t width, size_t height)
 
 	pic = malloc(sizeof(picture));
 	if (pic == NULL) {
-		fprintf(stderr, "Unable to allocate memory for picture: %s\n",
-			strerror(errno));
-		exit(EXIT_FAILURE);
+		fprintf(stderr, "Unable to allocate memory for picture: %s\n", strerror(errno));
+		goto picture_allocate_pic;
 	}
 
 	pic->pixels = malloc(sizeof(pixel) * width * height);
 	if (pic->pixels == NULL) {
 		fprintf(stderr, "Unable to allocate memory for picture pixels:"
 			" %s\n", strerror(errno));
-		free(pic);
-		exit(EXIT_FAILURE);
+		goto picture_allocate_pixels;
 	}
 	memset(pic->pixels, 0, sizeof(pixel) * width * height);
 
@@ -359,6 +357,11 @@ picture *picture_allocate(size_t width, size_t height)
 	pic->height = height;
 
 	return pic;
+
+picture_allocate_pixels:
+	free(pic);
+picture_allocate_pic:
+	return NULL;
 }
 
 void picture_free(picture *pic)
@@ -406,6 +409,8 @@ picture *picture_read(const char *name)
 	tiffp = NULL;
 
 	pic = picture_allocate(width, height);
+	if (pic == NULL)
+		goto picture_read_allocate;
 
 	pic->width = width;
 	pic->height = height;
@@ -419,6 +424,7 @@ picture *picture_read(const char *name)
 		}
 	}
 
+picture_read_allocate:
 picture_read_read:
 	free(buffer);
 picture_read_malloc:
