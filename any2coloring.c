@@ -125,6 +125,7 @@ void help_die(char *str)
 	fprintf(stderr, "\t-p <arg>\tpalette (colors, mandatory)\n");
 	fprintf(stderr, "\t-t <double>\ttext size in the svg output (defaults to 5.5)\n");
 	fprintf(stderr, "\t-w int\t\toutput image size (width or height)\n");
+	fprintf(stderr, "\t-s <arg>\toutput file (solution picture)\n");
 	exit(EXIT_FAILURE);
 }
 
@@ -565,7 +566,7 @@ GArray *picture_analysis(picture *pic)
 			// black line remaining on the righ (relative to pixel,
 			// direction).
 
-			for(;;) {
+			for (;;) {
 				pixel pixel_current = picture_get_pixel(pic, position);
 				if (pixel_current.checked)
 					break;
@@ -635,7 +636,7 @@ int pattern_to_svg(const char *output, const GArray *pattern_list, const GArray 
 	if (output) {
 		fp = fopen(output, "w");
 		if (fp == NULL) {
-			fprintf(stderr, "Unabel to write to file %s: %s\n", output, strerror(errno));
+			fprintf(stderr, "Unable to write to file %s: %s\n", output, strerror(errno));
 			return -1;
 		}
 	} else if (!soluce) {
