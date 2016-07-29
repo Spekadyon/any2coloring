@@ -240,6 +240,16 @@ GArray *palette_read(const char *str)
 			goto palette_read_str_malloc;
 		}
 
+		// Check if the color is black (0x0), as it is used to extract
+		// the outline of each "pixels".
+		// If color is black (0x0), replace it by a similar color,
+		// almost black (here 1/256th blue).
+		if (color == 0x0) {
+			fprintf(stderr, "Warning: black color is used internally by the pixelization procedure.\n");
+			fprintf(stderr, "Warning: color \"%s\" has been set to 0x%06X\n", tag, 0x1);
+			color = 0x1;
+		}
+
 		struct color_s col;
 		col = (struct color_s) {
 			.R = (color >> 16) & 0xFF,
