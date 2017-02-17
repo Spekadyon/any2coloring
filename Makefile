@@ -1,40 +1,29 @@
-CC?=gcc
 CXX?=g++
-CFLAGS?=-O3 -march=native -g3 -ggdb -std=c99 -flto
 CXXFLAGS?=-Og -march=native -ggdb -std=c++14
 LDFLAGS?=-Wl,-O1
 
-LDFLAGS+=-lm
+LDFLAGS+=-lX11 -pthread -lgmic
 
-PKG_CONFIG_MODULES=glib-2.0 libtiff-4
-CFLAGS+=`pkg-config --cflags $(PKG_CONFIG_MODULES)`
-LDFLAGS+=`pkg-config --libs $(PKG_CONFIG_MODULES)`
-
-SRC=any2coloring.c
-HEAD=
-
-BINARY=any2coloring
-OBJS= $(SRC:.c=.o)
+SRC=any2col.cpp libany2col.cpp
+HEAD=any2col.hpp
+OBJ=$(SRC:.cpp=.o)
 
 .PHONY: clean strip all
 
-all: $(BINARY) any2cpp
-
-%.o: %.c $(HEAD)
-	$(CC) -c $(CFLAGS) -Wall -Wextra $<
+all: any2col
 
 %.o: %.cpp
 	$(CXX) -c $(CXXFLAGS) -Wall -Wextra $<
 
-$(BINARY): $(OBJS)
-	$(CC) -o $@ $(LDFLAGS) $(CFLAGS) $(OBJS)
+any2col.o: any2col.hpp
+libany2col.o: any2col.hpp
 
-any2cpp: any2cpp.o
-	$(CXX) -o $@ $(CXXFLAGS) $< -lgmic -pthread -lX11
+any2col: $(OBJ)
+	$(CXX) -o $@ $(CXXFLAGS) $(OBJ) $(LDFLAGS)
 
 clean:
-	rm -f $(OBJS) $(BINARY) any2cpp any2cpp.o
+	rm -f $(OBJ) any2col
 
 strip:
-	strip --strip-unneeded --preserve-dates -R .comment $(BINARY)
+	strip --strip-unneeded --preserve-dates -R .comment any2col
 
