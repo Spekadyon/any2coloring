@@ -51,6 +51,7 @@ void help_exit(char *str)
 	fprintf(stdout, "\t-b <bottom margin>  bottom page margin\n");
 	fprintf(stdout, "\t-l <left margin>    left page margin\n");
 	fprintf(stdout, "\t-r <right margin>   right page margin\n");
+	fprintf(stdout, "\t-s                  print colored outputs, instead of numbered ones\n");
 
 	exit(EXIT_FAILURE);
 }
@@ -84,8 +85,9 @@ int main(int argc, char *argv[])
 	char *input_file = NULL;;
 	char *output_svg = NULL;
 	char *output_pdf = NULL;
+	bool need_colors = false;
 
-	while ( (opt = getopt(argc, argv, "hp:i:o:a:x:w:f:t:b:l:r:")) != -1 ) {
+	while ( (opt = getopt(argc, argv, "hp:i:o:a:x:w:f:t:b:l:r:s")) != -1 ) {
 		string str;
 		double convstr;
 		switch (opt) {
@@ -167,6 +169,9 @@ int main(int argc, char *argv[])
 			}
 			opts.margin.right = convstr;
 			break;
+		case 's':
+			need_colors = true;
+			break;
 		default:
 			fprintf(stderr, "Unhandled option: %c\n", (char)opt);
 		}
@@ -191,7 +196,7 @@ int main(int argc, char *argv[])
 	}
 
 	make_coloring(palette_file, input_file, opts, coloring);
-	coloring2svg(coloring, opts, svg, true);
+	coloring2svg(coloring, opts, svg, need_colors);
 
 	if (output_svg) {
 		ofstream fp;
