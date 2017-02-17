@@ -1,5 +1,5 @@
 CXX?=g++
-CXXFLAGS?=-Og -march=native -ggdb -std=c++14
+CXXFLAGS?=-O2 -march=native -g2 -std=c++14
 LDFLAGS?=-Wl,-O1
 
 LDFLAGS+=-lX11 -pthread -lgmic
@@ -9,6 +9,9 @@ HEAD=any2col.hpp
 OBJ=$(SRC:.cpp=.o)
 
 .PHONY: clean strip all
+
+CXXFLAGS+=`pkg-config --cflags librsvg-2.0 cairo-pdf`
+LDFLAGS+=`pkg-config --libs librsvg-2.0 cairo-pdf`
 
 all: any2col
 
