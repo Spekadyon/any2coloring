@@ -136,7 +136,7 @@ int main(int argc, char *argv[])
 		case 't':
 			str = optarg;
 			convstr = stod(str);
-			if (convstr <= 0) {
+			if (convstr < 0) {
 				fprintf(stderr, "Top margin must be positive\n");
 				exit(EXIT_FAILURE);
 			}
@@ -145,7 +145,7 @@ int main(int argc, char *argv[])
 		case 'b':
 			str = optarg;
 			convstr = stod(str);
-			if (convstr <= 0) {
+			if (convstr < 0) {
 				fprintf(stderr, "Bottom margin must be positive\n");
 				exit(EXIT_FAILURE);
 			}
@@ -154,7 +154,7 @@ int main(int argc, char *argv[])
 		case 'l':
 			str = optarg;
 			convstr = stod(str);
-			if (convstr <= 0) {
+			if (convstr < 0) {
 				fprintf(stderr, "Left margin must be positive\n");
 				exit(EXIT_FAILURE);
 			}
@@ -163,7 +163,7 @@ int main(int argc, char *argv[])
 		case 'r':
 			str = optarg;
 			convstr = stod(str);
-			if (convstr <= 0) {
+			if (convstr < 0) {
 				fprintf(stderr, "Right margin must be positive\n");
 				exit(EXIT_FAILURE);
 			}
