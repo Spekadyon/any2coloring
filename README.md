@@ -36,11 +36,10 @@ code.
 * [G'MIC](http://gmic.eu/download.shtml) as a library. The provided Makefile
   expects to find it in standard paths.
 * [CImg](http://cimg.eu/) (is a build-time dependency of G'MIC)
-* [RSVG](https://developer.gnome.org/rsvg/stable/), for the svg to pdf export
-* [Cairo](https://cairographics.org/)
+* [Cairo](https://cairographics.org/) for SVG and PDF output
 * [pkg-config](https://www.freedesktop.org/wiki/Software/pkg-config/), used to
-  automatically set CFLAGS/LDFLAGS for rsvg and cairo-pdf (not
-  mandatory, but Makefile should be edited accordingly)
+  automatically set CFLAGS/LDFLAGS for cairo-svg and cairo-pdf (not mandatory,
+  but Makefile should be edited accordingly)
 
 ### Build
 
@@ -65,7 +64,7 @@ Unless specified, sizes are given in millimeters.
 | -p | palette.csv | file providing the colors used to index the pixel-art picture (mandatory option) |
 | -i | input.png | input file, can be any picture supported by CImg/G'MIC. If the file contains multiple pictures, like animated gif, only the first one is processed. (mandatory option) |
 | -o | output.svg | output coloring as a SVG file (scalar vector graphics) |
-| -a | output.pdf | output coloring as a PDF file (converted from SVG using RSVG and cairo) |
+| -a | output.pdf | output coloring as a PDF file |
 | -x | pixel size | the size of one pixel, as rendered on the svg or pdf file |
 | -w | page width | defaults to A4 width (210 mm) |
 | -f | page height | defaults to A4 height (297 mm) |
