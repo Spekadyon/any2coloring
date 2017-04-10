@@ -27,10 +27,6 @@
 using namespace std;
 using namespace cimg_library;
 
-// C headers
-#include <librsvg/rsvg.h>
-#include <cairo-pdf.h>
-
 // getopt()
 #include <unistd.h>
 
@@ -196,6 +192,12 @@ int main(int argc, char *argv[])
 	}
 
 	make_coloring(palette_file, input_file, opts, coloring);
+	if (output_pdf)
+		coloring2pdf(output_pdf, coloring, opts, need_colors);
+	if (output_svg)
+		coloring2svg(output_svg, coloring, opts, need_colors);
+
+#if 0
 	coloring2svg(coloring, opts, svg, need_colors);
 
 	if (output_svg) {
@@ -237,8 +239,9 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "SVG dimensions: %d x %d\n", dimensions.width,
 			dimensions.height);
 
-		cairoSurface = cairo_pdf_surface_create(output_pdf, dimensions.width,
-							dimensions.height);
+		cairoSurface = cairo_pdf_surface_create(output_pdf, 595, 842);
+		//cairoSurface = cairo_pdf_surface_create(output_pdf, dimensions.width,
+							//dimensions.height);
 		cairoContext = cairo_create(cairoSurface);
 		rsvg_handle_render_cairo(svgHandle, cairoContext);
 		if ( (cairoStatus = cairo_status(cairoContext)) ) {
@@ -252,6 +255,7 @@ int main(int argc, char *argv[])
 		// Cleanup
 		g_object_unref(svgHandle);
 	}
+#endif
 
 	return EXIT_SUCCESS;
 }

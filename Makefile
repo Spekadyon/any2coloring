@@ -1,5 +1,5 @@
 CXX?=g++
-CXXFLAGS?=-O2 -march=native -g2 -std=c++14
+CXXFLAGS?=-O2 -march=native -g2
 LDFLAGS?=-Wl,-O1
 
 LDFLAGS+=-lX11 -pthread -lgmic
@@ -10,8 +10,8 @@ OBJ=$(SRC:.cpp=.o)
 
 .PHONY: clean strip all
 
-CXXFLAGS+=`pkg-config --cflags librsvg-2.0 cairo-pdf`
-LDFLAGS+=`pkg-config --libs librsvg-2.0 cairo-pdf`
+CXXFLAGS+= -std=c++14 `pkg-config --cflags cairo-svg cairo-pdf`
+LDFLAGS+=`pkg-config --libs cairo-svg cairo-pdf`
 
 all: any2col
 

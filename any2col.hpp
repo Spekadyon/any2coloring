@@ -59,6 +59,7 @@ struct Coloring {
 void read_palette(const char *filename, std::vector<struct color> &palette);
 void palette2CImg(std::vector<struct color> const &palette, cimg_library::CImg<float> &cimg_palette);
 void make_coloring(const char *palette_csv_file, const char *original_picture, struct col_opt const &opts, struct Coloring &coloring);
-void coloring2svg(struct Coloring const &coloring, struct col_opt const &opts, std::string &svg, bool soluce = false);
+void coloring2svg(const char *filename, struct Coloring const &coloring, struct col_opt const &opts, bool soluce = false);
+void coloring2pdf(const char *filename, struct Coloring const &coloring, struct col_opt const &opts, bool soluce = false);
 
 #endif /* _ANY2COL_H_ */

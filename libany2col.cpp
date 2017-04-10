@@ -18,6 +18,7 @@
  */
 
 #include <fstream>
+#include <stdexcept>
 #include <vector>
 
 #include <cstdio>
@@ -27,6 +28,14 @@
 #include <gmic.h>
 
 #include "any2col.hpp"
+
+#include <cairo-pdf.h>
+#include <cairo-svg.h>
+
+inline double mm_to_pt(double mm)
+{
+	return mm / 25.4 * 72.0;
+}
 
 using namespace cimg_library;
 
@@ -103,46 +112,183 @@ void make_coloring(const char *palette_csv_file, const char *original_picture, s
 	coloring.palette = palette;
 }
 
-void coloring2svg(struct Coloring const &coloring, struct col_opt const &opts, std::string &svg, bool soluce)
+void coloring2pdf(const char *filename, struct Coloring const &coloring, struct col_opt const &opts, bool soluce)
 {
-	// clear svg
-	svg.clear();
-	// SVG header
-	svg += "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>\n";
-	svg += "<svg xmlns=\"http://www.w3.org/2000/svg\" version=\"1.1\" width=\"" + std::to_string(opts.page.width) + "mm\" height=\""+ std::to_string(opts.page.height) + "mm\">\n";
-
-	// Image offset // SVG crap, don't work with units...
-	//svg += "\t<g transform=\"translate(" + std::to_string(opts.margin.left) + "mm, " + std::to_string(opts.margin.top) + "mm)\">\n";
+	cairo_surface_t *cairoSurface;
+	cairo_t *cairoContext;
 	double offset_x, offset_y;
+
 	offset_x = (opts.page.width + opts.margin.left - opts.margin.right)/2.0 - coloring.picture.width()*opts.px_size / 2.0;
 	offset_y = (opts.page.height + opts.margin.top - opts.margin.bottom)/2.0 - coloring.picture.height()*opts.px_size / 2.0;
-	// -> draw the page layout (margins + pixelized picture...) best
-	// compromise is to align the center of the expected picture and the
-	// pixelized one
 
-	// SVG body
-	for (int y = 0; y < coloring.picture.height(); y += 1) {
-		for (int x = 0; x < coloring.picture.width(); x += 1) {
-			char cpp_crap[7]; // Or maybe I should add libQtCore as a dep just to have QString::asprintf...
-			svg += "\t\t<rect x=\"" + std::to_string(offset_x + x*opts.px_size) + "mm\" y=\"" + std::to_string(offset_y + y*opts.px_size) + "mm\" width=\"" + std::to_string(opts.px_size) + "mm\" height=\"" + std::to_string(opts.px_size) + "mm\" ";
-			if (soluce) {
-				snprintf(cpp_crap, 7, "%02hhX%02hhX%02hhX",
-					 coloring.palette.at(coloring.picture(x, y, 0)).rgb.R,
-					 coloring.palette.at(coloring.picture(x, y, 0)).rgb.G,
-					 coloring.palette.at(coloring.picture(x, y, 0)).rgb.B);
-			} else {
-				std::memcpy(cpp_crap, "FFFFFF", sizeof(cpp_crap));
+	cairoSurface = cairo_pdf_surface_create(filename, mm_to_pt(opts.page.width), mm_to_pt(opts.page.height));
+	cairoContext = cairo_create(cairoSurface);
+
+	if (soluce) {
+		for (int y = 0; y < coloring.picture.height(); y += 1) {
+			for (int x = 0; x < coloring.picture.width(); x += 1) {
+				cairo_set_source_rgb(
+						     cairoContext,
+						     (double)coloring.palette.at(coloring.picture(x, y, 0)).rgb.R / 255.0,
+						     (double)coloring.palette.at(coloring.picture(x, y, 0)).rgb.G / 255.0,
+						     (double)coloring.palette.at(coloring.picture(x, y, 0)).rgb.B / 255.0
+						    );
+				cairo_rectangle(
+						cairoContext,
+						mm_to_pt(offset_x + x*opts.px_size),
+						mm_to_pt(offset_y + y*opts.px_size),
+						mm_to_pt(opts.px_size),
+						mm_to_pt(opts.px_size)
+					       );
+				cairo_fill(cairoContext);
 			}
-			svg += "fill=\"#";
-			svg += cpp_crap;
-			svg += "\" stroke-width=\"" + std::to_string(opts.px_size/12.0) + "mm\" stroke=\"grey\" />\n";
+		}
+	} else {
+		// stroke == light grey
+		// FIXME: doesn't need to be hardcoded...
+		cairo_set_source_rgb(cairoContext, 0xD3/255.0, 0xD3/255.0, 0xD3/255.0);
+		for (int y = 0; y < coloring.picture.height(); y += 1) {
+			for (int x = 0; x < coloring.picture.width(); x += 1) {
+				// print square; stroke width doesn't need to be
+				// hardcoded either
+				cairo_set_line_width(cairoContext, mm_to_pt(opts.px_size/20.0));
+				cairo_rectangle(
+						cairoContext,
+						mm_to_pt(offset_x + x*opts.px_size),
+						mm_to_pt(offset_y + y*opts.px_size),
+						mm_to_pt(opts.px_size),
+						mm_to_pt(opts.px_size)
+					       );
+				cairo_stroke(cairoContext);
 
-			svg += "\t\t<text x=\"" + std::to_string(offset_x + (x+0.5)*opts.px_size) + "mm\" y=\"" + std::to_string(offset_y + (y+1.0-0.2)*opts.px_size) + "mm\" font-family=\"DejaVu Sans\" font-size=\"" + std::to_string(opts.px_size*0.6) + "mm\" fill=\"grey\" style=\"text-anchor:middle;\">";
-			svg += coloring.palette.at(coloring.picture(x, y, 0)).name.c_str();
-			svg += "</text>\n";
+				cairo_text_extents_t te;
+				cairo_select_font_face(cairoContext, "DejaVu Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
+				cairo_set_font_size(cairoContext, mm_to_pt(opts.px_size*0.6));
+				cairo_text_extents(
+						   cairoContext,
+						   coloring.palette.at(coloring.picture(x, y, 0)).name.c_str(),
+						   &te
+						  );
+				cairo_move_to(
+					      cairoContext,
+					      mm_to_pt(offset_x + (x+0.5)*opts.px_size) - 0.5*te.width,
+					      mm_to_pt(offset_y + (y+0.5)*opts.px_size) + 0.5*te.height
+					     );
+				cairo_show_text(cairoContext, coloring.palette.at(coloring.picture(x, y, 0)).name.c_str());
+
+				cairo_fill(cairoContext);
+			}
 		}
 	}
-	// SVG end
-	//svg += "\t</g>\n";
-	svg += "</svg>\n";
+
+	cairo_surface_finish(cairoSurface);
+	cairo_destroy(cairoContext);
+	cairo_surface_destroy(cairoSurface);
 }
+
+void coloring2svg(const char *filename, struct Coloring const &coloring, struct col_opt const &opts, bool soluce)
+{
+	cairo_surface_t *cairoSurface;
+	cairo_t *cairoContext;
+	double offset_x, offset_y;
+
+	offset_x = (opts.page.width + opts.margin.left - opts.margin.right)/2.0 - coloring.picture.width()*opts.px_size / 2.0;
+	offset_y = (opts.page.height + opts.margin.top - opts.margin.bottom)/2.0 - coloring.picture.height()*opts.px_size / 2.0;
+
+	cairoSurface = cairo_svg_surface_create(filename, mm_to_pt(opts.page.width), mm_to_pt(opts.page.height));
+	cairoContext = cairo_create(cairoSurface);
+
+	if (soluce) {
+		for (int y = 0; y < coloring.picture.height(); y += 1) {
+			for (int x = 0; x < coloring.picture.width(); x += 1) {
+				cairo_set_source_rgb(
+						     cairoContext,
+						     (double)coloring.palette.at(coloring.picture(x, y, 0)).rgb.R / 255.0,
+						     (double)coloring.palette.at(coloring.picture(x, y, 0)).rgb.G / 255.0,
+						     (double)coloring.palette.at(coloring.picture(x, y, 0)).rgb.B / 255.0
+						    );
+				cairo_rectangle(
+						cairoContext,
+						mm_to_pt(offset_x + x*opts.px_size),
+						mm_to_pt(offset_y + y*opts.px_size),
+						mm_to_pt(opts.px_size),
+						mm_to_pt(opts.px_size)
+					       );
+				cairo_fill(cairoContext);
+			}
+		}
+	} else {
+		// stroke == light grey
+		// FIXME: doesn't need to be hardcoded...
+		cairo_set_source_rgb(cairoContext, 0xD3/255.0, 0xD3/255.0, 0xD3/255.0);
+		for (int y = 0; y < coloring.picture.height(); y += 1) {
+			for (int x = 0; x < coloring.picture.width(); x += 1) {
+				// print square; stroke width doesn't need to be
+				// hardcoded either
+				cairo_set_line_width(cairoContext, mm_to_pt(opts.px_size/20.0));
+				cairo_rectangle(
+						cairoContext,
+						mm_to_pt(offset_x + x*opts.px_size),
+						mm_to_pt(offset_y + y*opts.px_size),
+						mm_to_pt(opts.px_size),
+						mm_to_pt(opts.px_size)
+					       );
+				cairo_stroke(cairoContext);
+			}
+		}
+	}
+
+	cairo_surface_finish(cairoSurface);
+	cairo_destroy(cairoContext);
+	cairo_surface_destroy(cairoSurface);
+}
+
+//void coloring2svg(struct Coloring const &coloring, struct col_opt const &opts, std::string &svg, bool soluce)
+//{
+	//// clear svg
+	//svg.clear();
+	//// SVG header
+	//svg += "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>\n";
+	//svg += "<svg xmlns=\"http://www.w3.org/2000/svg\" version=\"1.1\" width=\"" + std::to_string(opts.page.width) + "mm\" height=\""+ std::to_string(opts.page.height) + "mm\">\n";
+
+	//// Image offset // SVG crap, don't work with units...
+	////svg += "\t<g transform=\"translate(" + std::to_string(opts.margin.left) + "mm, " + std::to_string(opts.margin.top) + "mm)\">\n";
+	//double offset_x, offset_y;
+	//offset_x = (opts.page.width + opts.margin.left - opts.margin.right)/2.0 - coloring.picture.width()*opts.px_size / 2.0;
+	//offset_y = (opts.page.height + opts.margin.top - opts.margin.bottom)/2.0 - coloring.picture.height()*opts.px_size / 2.0;
+	//// -> draw the page layout (margins + pixelized picture...) best
+	//// compromise is to align the center of the expected picture and the
+	//// pixelized one
+
+	//// SVG body
+	//for (int y = 0; y < coloring.picture.height(); y += 1) {
+		//for (int x = 0; x < coloring.picture.width(); x += 1) {
+			//char cpp_crap[7]; // Or maybe I should add libQtCore as a dep just to have QString::asprintf...
+			//svg += "\t\t<rect x=\"" + std::to_string(offset_x + x*opts.px_size) + "mm\" y=\"" + std::to_string(offset_y + y*opts.px_size) + "mm\" width=\"" + std::to_string(opts.px_size) + "mm\" height=\"" + std::to_string(opts.px_size) + "mm\" ";
+			//if (soluce) {
+				//snprintf(cpp_crap, 7, "%02hhX%02hhX%02hhX",
+					 //coloring.palette.at(coloring.picture(x, y, 0)).rgb.R,
+					 //coloring.palette.at(coloring.picture(x, y, 0)).rgb.G,
+					 //coloring.palette.at(coloring.picture(x, y, 0)).rgb.B);
+			//} else {
+				//std::memcpy(cpp_crap, "FFFFFF", sizeof(cpp_crap));
+			//}
+			//svg += "fill=\"#";
+			//svg += cpp_crap;
+			//svg += "\" stroke-width=\"";
+			//if (soluce) {
+				//svg += "0";
+			//} else {
+				//svg += std::to_string(opts.px_size/20.0);
+			//}
+			//svg += "mm\" stroke=\"lightgrey\" />\n";
+
+			//svg += "\t\t<text x=\"" + std::to_string(offset_x + (x+0.5)*opts.px_size) + "mm\" y=\"" + std::to_string(offset_y + (y+1.0-0.2)*opts.px_size) + "mm\" font-family=\"DejaVu Sans\" font-size=\"" + std::to_string(opts.px_size*0.6) + "mm\" fill=\"lightgrey\" style=\"text-anchor:middle;\">";
+			//svg += coloring.palette.at(coloring.picture(x, y, 0)).name.c_str();
+			//svg += "</text>\n";
+		//}
+	//}
+	//// SVG end
+	////svg += "\t</g>\n";
+	//svg += "</svg>\n";
+//}
