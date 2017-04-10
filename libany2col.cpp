@@ -88,6 +88,7 @@ void make_coloring(const char *palette_csv_file, const char *original_picture, s
 
 	// Read original picture
 	cimgList[0].load(original_picture);
+	cimgList[0].resize(-100, -100, -100, 3); // prevent abort() if picture is gray
 
 	// build cmdline
 	gmic_cmdline =
