@@ -197,65 +197,6 @@ int main(int argc, char *argv[])
 	if (output_svg)
 		coloring2svg(output_svg, coloring, opts, need_colors);
 
-#if 0
-	coloring2svg(coloring, opts, svg, need_colors);
-
-	if (output_svg) {
-		ofstream fp;
-		fp.open(output_svg, ofstream::out | ofstream::trunc);
-		fp << svg;
-		fp.close();
-	}
-
-
-	if (output_pdf) {
-		// SVG to  PDF conversion! (powa, toussa...)
-		RsvgHandle *svgHandle;
-		GError *gerror = NULL;
-		RsvgDimensionData dimensions;
-		cairo_surface_t *cairoSurface;
-		cairo_t *cairoContext;
-		cairo_status_t cairoStatus;
-		bool ret;
-
-		svgHandle = rsvg_handle_new_with_flags(RSVG_HANDLE_FLAG_UNLIMITED);
-		ret = rsvg_handle_write(svgHandle,
-					(const unsigned char *)svg.c_str(),
-					strlen(svg.c_str()), &gerror);
-		if (!ret) {
-			fprintf(stderr, "RSvg is unable to load svg: %s\n",
-				gerror->message);
-			exit(EXIT_FAILURE);
-		}
-		gerror = NULL;
-		ret = rsvg_handle_close(svgHandle, &gerror);
-		if (!ret) {
-			fprintf(stderr, "RSvg is unable to load svg: %s\n",
-				gerror->message);
-			exit(EXIT_FAILURE);
-		}
-
-		rsvg_handle_get_dimensions(svgHandle, &dimensions);
-		fprintf(stderr, "SVG dimensions: %d x %d\n", dimensions.width,
-			dimensions.height);
-
-		cairoSurface = cairo_pdf_surface_create(output_pdf, 595, 842);
-		//cairoSurface = cairo_pdf_surface_create(output_pdf, dimensions.width,
-							//dimensions.height);
-		cairoContext = cairo_create(cairoSurface);
-		rsvg_handle_render_cairo(svgHandle, cairoContext);
-		if ( (cairoStatus = cairo_status(cairoContext)) ) {
-			fprintf(stderr, "Unable to convert svg to pdf: %s\n",
-				cairo_status_to_string(cairoStatus));
-			exit(EXIT_FAILURE);
-		}
-
-		cairo_destroy(cairoContext);
-		cairo_surface_destroy(cairoSurface);
-		// Cleanup
-		g_object_unref(svgHandle);
-	}
-#endif
 
 	return EXIT_SUCCESS;
 }
