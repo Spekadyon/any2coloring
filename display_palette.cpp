@@ -25,42 +25,11 @@
 #include <cstdlib>
 
 #include <CImg.h>
-#include <gmic.h>
+
+#include "any2col.hpp"
 
 using namespace std;
 using namespace cimg_library;
-
-struct color {
-	struct {
-		uint8_t R;
-		uint8_t G;
-		uint8_t B;
-	} rgb;
-	string name;
-};
-
-void read_palette(const char *filename, vector<struct color> &palette)
-{
-	ifstream fp;
-	string str_colrgb;
-	string str_colname;
-
-	fp.open(filename);
-
-	while (fp >> str_colrgb >> str_colname) {
-		color Color;
-		uint32_t rawcolor;
-		Color.name = str_colname;
-		rawcolor = stoi(str_colrgb, NULL, 16);
-		Color.rgb.R = rawcolor >> 2*8;
-		Color.rgb.G = (uint32_t)(rawcolor >> 8) & (uint32_t)(0xFFU);
-		Color.rgb.B = (uint32_t)(rawcolor) & (uint32_t)(0xFFU);
-		palette.push_back(Color);
-	}
-
-	fp.close();
-}
-
 
 int main(int argc, char *argv[])
 {
@@ -74,12 +43,7 @@ int main(int argc, char *argv[])
 	}
 
 	read_palette(argv[1], palette);
-	cimg_palette.assign(palette.size(), 1, 1, 3);
-	for (size_t i = 0; i < palette.size(); i += 1) {
-		cimg_palette(i, 0, 0, 0) = palette[i].rgb.R;
-		cimg_palette(i, 0, 0, 1) = palette[i].rgb.G;
-		cimg_palette(i, 0, 0, 2) = palette[i].rgb.B;
-	}
+	palette2CImg(palette, cimg_palette);
 
 	cimg_palette.display();
 
