@@ -146,7 +146,6 @@ void coloring2pdf(const char *filename, struct Coloring const &coloring, struct 
 
 	QPageSize pageSize(QSizeF(opts.page.width, opts.page.height), QPageSize::Millimeter);
 	QPageLayout pageLayout(pageSize, QPageLayout::Portrait, QMarginsF(0, 0, 0, 0), QPageLayout::Millimeter);
-	qDebug() << pageLayout.units();
 	pdfWriter.setPageLayout(pageLayout);
 	pdfWriter.setTitle(QObject::tr("Coloriage !"));
 	pdfWriter.setCreator(QString("any2coloring"));
