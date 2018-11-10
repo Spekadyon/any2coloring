@@ -51,6 +51,9 @@ struct col_opt {
 		double left;
 	} margin;
 	double px_size;
+	// Lines and text colors, as 0-255 gray level
+	uint8_t lineColor;
+	uint8_t textColor;
 };
 
 struct Coloring {

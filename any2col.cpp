@@ -41,8 +41,10 @@ void help_exit(char *str)
 	fprintf(stdout, "\t-h                  print help and exit\n");
 	fprintf(stdout, "\t-p <palette.csv>    color palette (mandatory)\n");
 	fprintf(stdout, "\t-i <input.png>      input picture (mandatory)\n");
-	fprintf(stdout, "\t-o <output.svg>     coloring output, as a svg file\n");
-	fprintf(stdout, "\t-a <output.pdf>     coloring output, pdf format\n");
+//	fprintf(stdout, "\t-o <output.svg>     coloring output, as a svg file\n");
+	fprintf(stdout, "\t-a <output.pdf>     coloring output, pdf format (mandatory)\n");
+	fprintf(stdout, "\t-g <gray level>     line color, 0-255 integer (default: 176)\n");
+	fprintf(stdout, "\t-k <gray level>     text color, 0-255 integer (default: 80)\n");
 	fprintf(stdout, "\t-x <pixel size>     size of one pixel, in millimeters (default: 2.0)\n");
 	fprintf(stdout, "\t-w <page width>     page width in millimeters (default: 210.0)\n");
 	fprintf(stdout, "\t-f <page height>    page height in millimeters (default: 297.0)\n");
@@ -76,6 +78,8 @@ int main(int argc, char *argv[])
 	opts.margin.right  = 5.0;
 	opts.margin.left   = 5.0;
 	opts.px_size       = 2.0;
+	opts.lineColor     = 176; // 0xB0
+	opts.textColor     = 80;  // 0x50
 
 	/*
 	 * command line parsing
@@ -87,9 +91,10 @@ int main(int argc, char *argv[])
 	char *output_pdf = NULL;
 	bool need_colors = false;
 
-	while ( (opt = getopt(argc, argv, "hp:i:o:a:x:w:f:t:b:l:r:s")) != -1 ) {
+	while ( (opt = getopt(argc, argv, "hp:i:o:a:x:w:f:t:b:l:r:sg:k:")) != -1 ) {
 		string str;
 		double convstr;
+		int result;
 		switch (opt) {
 		case 'h':
 			help_exit(argv[0]);
@@ -171,6 +176,24 @@ int main(int argc, char *argv[])
 			break;
 		case 's':
 			need_colors = true;
+			break;
+		case 'g':
+			str = optarg;
+			result = stoi(str, nullptr, 0);
+			if (result < 0 || result > 255) {
+				fprintf(stderr, "Invalid line color: %d, must be in 0-255 interval\n", result);
+				exit(EXIT_FAILURE);
+			}
+			opts.lineColor = result;
+			break;
+		case 'k':
+			str = optarg;
+			result = stoi(str, nullptr, 0);
+			if (result < 0 || result > 255) {
+				fprintf(stderr, "Invalid text color: %d, must be in 0-255 interval\n", result);
+				exit(EXIT_FAILURE);
+			}
+			opts.textColor = result;
 			break;
 		default:
 			fprintf(stderr, "Unhandled option: %c\n", (char)opt);

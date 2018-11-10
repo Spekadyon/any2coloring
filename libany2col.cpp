@@ -167,12 +167,13 @@ void coloring2pdf(const char *filename, struct Coloring const &coloring, struct 
 			}
 		}
 	} else {
-		QPen pen;
+		QPen penLines;
+		QPen penFonts;
 		QFont font;
-		pen.setColor(QColor(0xB0, 0xB0, 0xB0));
-		pen.setStyle(Qt::SolidLine);
-		pen.setWidthF(mm2pdf(pdfWriter.resolution(), opts.px_size/20.0));
-		qPainter.setPen(pen);
+		penLines.setColor(QColor(opts.lineColor, opts.lineColor, opts.lineColor));
+		penLines.setStyle(Qt::SolidLine);
+		penLines.setWidthF(mm2pdf(pdfWriter.resolution(), opts.px_size/20.0));
+		penFonts.setColor(QColor(opts.textColor, opts.textColor, opts.textColor));
 		font.setFamily("Sans");
 		font.setPointSizeF(mm2pdf(pdfWriter.resolution(), opts.px_size)*0.035);
 		qPainter.setFont(font);
@@ -182,7 +183,9 @@ void coloring2pdf(const char *filename, struct Coloring const &coloring, struct 
 				rectx = mm2pdf(pdfWriter.resolution(), offset_x + x*opts.px_size);
 				recty = mm2pdf(pdfWriter.resolution(), offset_y + y*opts.px_size);
 				rectw = recth = mm2pdf(pdfWriter.resolution(), opts.px_size);
+				qPainter.setPen(penLines);
 				qPainter.drawRect(QRectF(rectx, recty, rectw, recth));
+				qPainter.setPen(penFonts);
 				qPainter.drawText(QRectF(rectx, recty, rectw, recth), Qt::AlignCenter | Qt::AlignHCenter, coloring.palette.at(coloring.picture(x, y, 0)).name);
 			}
 		}
