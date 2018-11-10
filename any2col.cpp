@@ -17,6 +17,9 @@
  * any2coloring. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <QGuiApplication>
+#include <QTimer>
+
 #include <iostream>
 #include <fstream>
 
@@ -58,7 +61,8 @@ int main(int argc, char *argv[])
 	// Main vars
 	struct Coloring coloring;
 	struct col_opt opts;
-	string svg;
+
+	QGuiApplication a(argc, argv);
 
 	/*
 	 * Default opt values
@@ -197,8 +201,9 @@ int main(int argc, char *argv[])
 	if (output_svg)
 		coloring2svg(output_svg, coloring, opts, need_colors);
 
+	QTimer::singleShot(0, QCoreApplication::instance(), SLOT(quit()));
 
-	return EXIT_SUCCESS;
+	return a.exec();
 }
 
 

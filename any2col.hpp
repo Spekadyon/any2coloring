@@ -20,6 +20,9 @@
  * any2coloring. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <QString>
+#include <QVector>
+
 #include <iostream>
 #include <vector>
 
@@ -33,7 +36,7 @@ struct color {
 		uint8_t G;
 		uint8_t B;
 	} rgb;
-	std::string name;
+	QString name;
 };
 
 struct col_opt {
@@ -52,12 +55,12 @@ struct col_opt {
 
 struct Coloring {
 	cimg_library::CImg<float> picture;
-	std::vector<struct color> palette;
+	QVector<struct color> palette;
 };
 
 
-void read_palette(const char *filename, std::vector<struct color> &palette);
-void palette2CImg(std::vector<struct color> const &palette, cimg_library::CImg<float> &cimg_palette);
+bool read_palette(const char *filename, QVector<struct color> &palette);
+void palette2CImg(QVector<struct color> const &palette, cimg_library::CImg<float> &cimg_palette);
 void make_coloring(const char *palette_csv_file, const char *original_picture, struct col_opt const &opts, struct Coloring &coloring);
 void coloring2svg(const char *filename, struct Coloring const &coloring, struct col_opt const &opts, bool soluce = false);
 void coloring2pdf(const char *filename, struct Coloring const &coloring, struct col_opt const &opts, bool soluce = false);

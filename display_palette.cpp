@@ -19,7 +19,7 @@
 
 #include <iostream>
 #include <fstream>
-#include <vector>
+#include <QVector>
 
 #include <cstdint>
 #include <cstdlib>
@@ -33,7 +33,7 @@ using namespace cimg_library;
 
 int main(int argc, char *argv[])
 {
-	vector<struct color> palette;
+	QVector<struct color> palette;
 	CImg<float> cimg_palette;
 
 	if (argc != 2) {
