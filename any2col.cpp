@@ -66,6 +66,9 @@ int main(int argc, char *argv[])
 
 	QGuiApplication a(argc, argv);
 
+	// hack to force period as the decimal separator
+	setlocale(LC_NUMERIC, "C");
+
 	/*
 	 * Default opt values
 	 */
