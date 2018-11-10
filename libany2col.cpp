@@ -137,8 +137,6 @@ static inline double mm2pdf(int dpi, double mm)
 
 void coloring2pdf(const char *filename, struct Coloring const &coloring, struct col_opt const &opts, bool soluce)
 {
-	//cairo_surface_t *cairoSurface;
-	//cairo_t *cairoContext;
 	double offset_x, offset_y;
 	QPdfWriter pdfWriter(filename);
 	QPainter qPainter;
@@ -150,15 +148,9 @@ void coloring2pdf(const char *filename, struct Coloring const &coloring, struct 
 	QPageLayout pageLayout(pageSize, QPageLayout::Portrait, QMarginsF(0, 0, 0, 0), QPageLayout::Millimeter);
 	qDebug() << pageLayout.units();
 	pdfWriter.setPageLayout(pageLayout);
-	//pdfWriter.setPageSize(pageSize);
 	pdfWriter.setTitle(QObject::tr("Coloriage !"));
 	pdfWriter.setCreator(QString("any2coloring"));
-	//pdfWriter.setPageMargins(QMarginsF(0, 0, 0, 0));
 	qPainter.begin(&pdfWriter);
-	//qDebug() << pdfWriter.pageLayout().units();
-	//qDebug() << static_cast<QPdfWriter const *>(qPainter.device())->pageLayout().units();
-	//qDebug() << qPainter.viewport();
-	//qDebug() << pdfWriter.resolution();
 
 	if (soluce) {
 		for (int y = 0; y < coloring.picture.height(); y += 1) {
@@ -195,127 +187,15 @@ void coloring2pdf(const char *filename, struct Coloring const &coloring, struct 
 			}
 		}
 	}
-
-	//qPainter.end();
-	//cairoSurface = cairo_pdf_surface_create(filename, mm_to_pt(opts.page.width), mm_to_pt(opts.page.height));
-	//cairoContext = cairo_create(cairoSurface);
-
-	//if (soluce) {
-		//for (int y = 0; y < coloring.picture.height(); y += 1) {
-			//for (int x = 0; x < coloring.picture.width(); x += 1) {
-				//cairo_set_source_rgb(
-						     //cairoContext,
-						     //(double)coloring.palette.at(coloring.picture(x, y, 0)).rgb.R / 255.0,
-						     //(double)coloring.palette.at(coloring.picture(x, y, 0)).rgb.G / 255.0,
-						     //(double)coloring.palette.at(coloring.picture(x, y, 0)).rgb.B / 255.0
-						    //);
-				//cairo_rectangle(
-						//cairoContext,
-						//mm_to_pt(offset_x + x*opts.px_size),
-						//mm_to_pt(offset_y + y*opts.px_size),
-						//mm_to_pt(opts.px_size),
-						//mm_to_pt(opts.px_size)
-					       //);
-				//cairo_fill(cairoContext);
-			//}
-		//}
-	//} else {
-		// stroke == light grey
-		// FIXME: doesn't need to be hardcoded...
-		//cairo_set_source_rgb(cairoContext, 0xb0/255.0, 0xb0/255.0, 0xb0/255.0);
-		//for (int y = 0; y < coloring.picture.height(); y += 1) {
-			//for (int x = 0; x < coloring.picture.width(); x += 1) {
-				// print square; stroke width doesn't need to be
-				// hardcoded either
-				//cairo_set_line_width(cairoContext, mm_to_pt(opts.px_size/20.0));
-				//cairo_rectangle(
-						//cairoContext,
-						//mm_to_pt(offset_x + x*opts.px_size),
-						//mm_to_pt(offset_y + y*opts.px_size),
-						//mm_to_pt(opts.px_size),
-						//mm_to_pt(opts.px_size)
-					       //);
-				//cairo_stroke(cairoContext);
-
-				//cairo_text_extents_t te;
-				//cairo_select_font_face(cairoContext, "DejaVu Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
-				//cairo_set_font_size(cairoContext, mm_to_pt(opts.px_size*0.6));
-				//cairo_text_extents(
-						   //cairoContext,
-						   //coloring.palette.at(coloring.picture(x, y, 0)).name.c_str(),
-						   //&te
-						  //);
-				//cairo_move_to(
-					      //cairoContext,
-					      //mm_to_pt(offset_x + (x+0.5)*opts.px_size) - 0.5*te.width,
-					      //mm_to_pt(offset_y + (y+0.5)*opts.px_size) + 0.5*te.height
-					     //);
-				//cairo_show_text(cairoContext, coloring.palette.at(coloring.picture(x, y, 0)).name.c_str());
-
-				//cairo_fill(cairoContext);
-			//}
-		//}
-	//}
-
-	//cairo_surface_finish(cairoSurface);
-	//cairo_destroy(cairoContext);
-	//cairo_surface_destroy(cairoSurface);
 }
 
 void coloring2svg(const char *filename, struct Coloring const &coloring, struct col_opt const &opts, bool soluce)
 {
-	//cairo_surface_t *cairoSurface;
-	//cairo_t *cairoContext;
-	double offset_x, offset_y;
+	Q_UNUSED(filename);
+	Q_UNUSED(coloring);
+	Q_UNUSED(opts);
+	Q_UNUSED(soluce);
 
-	offset_x = (opts.page.width + opts.margin.left - opts.margin.right)/2.0 - coloring.picture.width()*opts.px_size / 2.0;
-	offset_y = (opts.page.height + opts.margin.top - opts.margin.bottom)/2.0 - coloring.picture.height()*opts.px_size / 2.0;
-
-	//cairoSurface = cairo_svg_surface_create(filename, mm_to_pt(opts.page.width), mm_to_pt(opts.page.height));
-	//cairoContext = cairo_create(cairoSurface);
-
-	if (soluce) {
-		for (int y = 0; y < coloring.picture.height(); y += 1) {
-			for (int x = 0; x < coloring.picture.width(); x += 1) {
-				//cairo_set_source_rgb(
-						     //cairoContext,
-						     //(double)coloring.palette.at(coloring.picture(x, y, 0)).rgb.R / 255.0,
-						     //(double)coloring.palette.at(coloring.picture(x, y, 0)).rgb.G / 255.0,
-						     //(double)coloring.palette.at(coloring.picture(x, y, 0)).rgb.B / 255.0
-						    //);
-				//cairo_rectangle(
-						//cairoContext,
-						//mm_to_pt(offset_x + x*opts.px_size),
-						//mm_to_pt(offset_y + y*opts.px_size),
-						//mm_to_pt(opts.px_size),
-						//mm_to_pt(opts.px_size)
-					       //);
-				//cairo_fill(cairoContext);
-			}
-		}
-	} else {
-		// stroke == light grey
-		// FIXME: doesn't need to be hardcoded...
-		//cairo_set_source_rgb(cairoContext, 0xD3/255.0, 0xD3/255.0, 0xD3/255.0);
-		for (int y = 0; y < coloring.picture.height(); y += 1) {
-			for (int x = 0; x < coloring.picture.width(); x += 1) {
-				// print square; stroke width doesn't need to be
-				// hardcoded either
-				//cairo_set_line_width(cairoContext, mm_to_pt(opts.px_size/20.0));
-				//cairo_rectangle(
-						//cairoContext,
-						//mm_to_pt(offset_x + x*opts.px_size),
-						//mm_to_pt(offset_y + y*opts.px_size),
-						//mm_to_pt(opts.px_size),
-						//mm_to_pt(opts.px_size)
-					       //);
-				//cairo_stroke(cairoContext);
-			}
-		}
-	}
-
-	//cairo_surface_finish(cairoSurface);
-	//cairo_destroy(cairoContext);
-	//cairo_surface_destroy(cairoSurface);
+	qDebug() << "SVG export not supported yet";
 }
 
