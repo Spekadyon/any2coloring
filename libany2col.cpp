@@ -90,12 +90,17 @@ void make_coloring(const char *palette_csv_file, const char *original_picture, s
 	QString gmic_cmdline;
 	QByteArray byteArray;
 	gmic gmic_obj;
+    bool result;
 
 	double pic_width = opts.page.width - opts.margin.right - opts.margin.left;
 	double pic_height = opts.page.height - opts.margin.top - opts.margin.bottom;
 
 	// Read palette from file
-	read_palette(palette_csv_file, palette);
+    result = read_palette(palette_csv_file, palette);
+    if (!result) {
+        qDebug() << Q_FUNC_INFO << "Palette file read error, aborting";
+        exit(EXIT_FAILURE);
+    }
 	palette2CImg(palette, cimgList[1]);
 
 	// Read original picture
