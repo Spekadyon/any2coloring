@@ -350,7 +350,7 @@ int main(int argc, char *argv[])
                  opts,
                  needColour);
 
-	QTimer::singleShot(0, QCoreApplication::instance(), SLOT(quit()));
+    QTimer::singleShot(0, &app, &QCoreApplication::quit);
 
     return app.exec();
 }
