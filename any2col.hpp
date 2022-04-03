@@ -2,7 +2,7 @@
 #define _ANY2COL_H_
 
 /*
- * Copyright 2017 - Geoffrey Brun <geoffrey@spekadyon.org>
+ * Copyright 2017-2022 - Geoffrey Brun <geoffrey@spekadyon.org>
  *
  * This file is part of any2coloring.
  *
