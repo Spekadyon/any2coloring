@@ -1,7 +1,7 @@
 TEMPLATE = app
 TARGET = any2coloring
 INCLUDEPATH += .
-QT += core gui svg
+QT += core gui
 
 CONFIG += \
     link_pkgconfig \

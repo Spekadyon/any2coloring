@@ -224,8 +224,8 @@ int main(int argc, char *argv[])
 	make_coloring(palette_file, input_file, opts, coloring);
 	if (output_pdf)
 		coloring2pdf(output_pdf, coloring, opts, need_colors);
-	if (output_svg)
-		coloring2svg(output_svg, coloring, opts, need_colors);
+	//if (output_svg)
+		//coloring2svg(output_svg, coloring, opts, need_colors);
 
 	QTimer::singleShot(0, QCoreApplication::instance(), SLOT(quit()));
 

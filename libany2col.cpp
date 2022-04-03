@@ -21,7 +21,6 @@
 #include <QFile>
 #include <QPainter>
 #include <QPdfWriter>
-#include <QSvgGenerator>
 #include <QVector>
 
 #include <CImg.h>
@@ -189,15 +188,5 @@ void coloring2pdf(const char *filename, struct Coloring const &coloring, struct 
 			}
 		}
 	}
-}
-
-void coloring2svg(const char *filename, struct Coloring const &coloring, struct col_opt const &opts, bool soluce)
-{
-	Q_UNUSED(filename);
-	Q_UNUSED(coloring);
-	Q_UNUSED(opts);
-	Q_UNUSED(soluce);
-
-	qDebug() << "SVG export not supported yet";
 }
 
