@@ -33,50 +33,56 @@ code.
 
 ### Dependencies
 
-* [G'MIC](http://gmic.eu/download.shtml) as a library. The provided Makefile
-  expects to find it in standard paths.
-* [CImg](http://cimg.eu/) (is a build-time dependency of G'MIC)
-* [Cairo](https://cairographics.org/) for SVG and PDF output
+* [G'MIC](http://gmic.eu/download.shtml) as a library. You may have to modify
+  the provided pro file if qmake doesn't find it.
+* [CImg](http://cimg.eu/) (it's a build-time dependency of G'MIC)
+* [Qt](https://www.qt.io/) version 5 is supported, 6 may be compatible but not
+  tested.
 * [pkg-config](https://www.freedesktop.org/wiki/Software/pkg-config/), used to
-  automatically set CFLAGS/LDFLAGS for cairo-svg and cairo-pdf (not mandatory,
-  but Makefile should be edited accordingly)
+  resolve gmic libX11 dependency.
+
 
 ### Build
 
-* If required, edit Makefile
+_This has only be tested on Linux/x86_64. May run on other systems with the
+requirements above._
+
+* If required, edit the qmake project file: `any2col.pro`
+* `qmake`
 * `make`
 
 ## Usage
 
 ### Typical usage
 
-`any2col -i input_picture.jpg -o output_picture.svg -p palette.csv`
+`any2coloring -i input_picture.jpg -o output_picture.pdf -p palette.csv`
 
-`any2col -i input_picture.jpg -s -o output_picture_soluce.svg -p palette.csv`
+`any2coloring -i input_picture.jpg -s -o output_picture_soluce.pdf -p palette.csv`
 
 ### Options
 
 Unless specified, sizes are given in millimeters.
 
-| Flag | Argument | Description |
-| :---:| :---: | :--- |
-| -h | none | print help and exit |
-| -p | palette.csv | file providing the colors used to index the pixel-art picture (mandatory option) |
-| -i | input.png | input file, can be any picture supported by CImg/G'MIC. If the file contains multiple pictures, like animated gif, only the first one is processed. (mandatory option) |
-| -o | output.svg | output coloring as a SVG file (scalar vector graphics) |
-| -a | output.pdf | output coloring as a PDF file |
-| -x | pixel size | the size of one pixel, as rendered on the svg or pdf file |
-| -w | page width | defaults to A4 width (210 mm) |
-| -f | page height | defaults to A4 height (297 mm) |
-| -t | top margin | minimal top margin, defaults to 5 mm. May be larger due to input file geometry |
-| -b | bottom margin | minimal bottom margin, defaults to 5 mm. May be larger due to input file geometry |
-| -l | left margin | minimal left margin, defaults to 5 mm. May be larger due to input file geometry |
-| -r | right margin | minimal right margin, defaults to 5 mm. May be larger due to input file geometry |
-| -s | none | colored outputs (color labels are replaced by the color they actually represents) |
+| Flag | Long Option | Argument | Description |
+| :---: | :--- | :---: | :--- |
+| -h | --help | none | print help and exits |
+| -v | --version | none | print software version and exits |
+| -p | --palette | palette.csv | file providing the colors used to index the pixel-art picture (mandatory option) |
+| -i | --input | input.png | input file, can be any picture supported by CImg/G'MIC. If the file contains multiple pictures, like animated gif, only the first one is processed. (mandatory option) |
+| -o | --output | output.pdf | output coloring as a PDF file |
+| -k | --text-color | color | text color, expects an integer value from 0 to 255, rendered gray |
+| -g | --line-color | color | line color, expects an integer value from 0 to 255, rendered gray |
+| -x | --pixel-size | pixel size | the size of one pixel, as rendered on the pdf file |
+| -w | --page-width | page width | defaults to A4 width (210 mm) |
+| -f | --page-height | page height | defaults to A4 height (297 mm) |
+| -t | --margin-top | top margin | minimal top margin, defaults to 5 mm. May be larger due to input file geometry |
+| -b | --margin-bottom | bottom margin | minimal bottom margin, defaults to 5 mm. May be larger due to input file geometry |
+| -l | --margin-left | left margin | minimal left margin, defaults to 5 mm. May be larger due to input file geometry |
+| -r | --margin-right | right margin | minimal right margin, defaults to 5 mm. May be larger due to input file geometry |
+| -c | --color-output | none | colored output (color labels are replaced by the color they actually represents) |
 
 Some parameters are hard-coded and may only be changed by recompiling the
 program. This includes:
-* the color of both the text (color IDs) and the grid;
 * the thickness of the grid;
 * the size of the text;
 * the font.
