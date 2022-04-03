@@ -104,15 +104,15 @@ void make_coloring(const char *palette_csv_file, const char *original_picture, s
 
 	// build cmdline
 	gmic_cmdline = QString::asprintf(
-					 "-l[0] "
+					 "-local[0] "
 					 "-if {w>h} -rotate 90 -endif "
 					 "-if {h/w>%g} "
 					 "-r2dy {int(%g)} "
 					 "-else "
 					 "-r2dx {int(%g)} "
 					 "-endif "
-					 "-endl "
-					 "-index.. .,1 --map[0] [1] -rm..",
+					 "-endlocal "
+					 "-index.. .,1 +map[0] [1] -rm..",
 					 (double)pic_height/(double)pic_width,
 					 (double)pic_height/(double)opts.px_size,
 					 (double)pic_width/(double)opts.px_size
